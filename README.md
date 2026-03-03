@@ -43,6 +43,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
   - [MCP Integration](#mcp-integration)
   - [Use Custom Pipeline](#use-custom-pipeline)
   - [Override Default Processors](#override-default-processors)
+  - [Hybrid Search](#hybrid-search-bm25--semantic--rrf-)
 
 - [Use RAGLight with Docker](#use-raglight-with-docker)
 
@@ -73,6 +74,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 - 🔌 **MCP Integration**: Add external tool capabilities (e.g. code execution, database access) via MCP servers.
 - **Flexible Document Support**: Ingest and index various document types (e.g., PDF, TXT, DOCX, Python, Javascript, ...).
 - **Extensible Architecture**: Easily swap vector stores, embedding models, or LLMs to suit your needs.
+- 🔍 **Hybrid Search (BM25 + Semantic + RRF)**: Combine keyword-based BM25 retrieval with dense vector search using Reciprocal Rank Fusion for best-of-both-worlds results.
 
 ---
 
@@ -498,6 +500,77 @@ vector_store.ingest(data_path=data_path)
 ```
 
 With this setup, all `.pdf` files will be processed by your custom `VlmPDFProcessor`, while other file types keep using the default processors.
+
+### Hybrid Search (BM25 + Semantic + RRF) 🔍
+
+RAGLight supports three retrieval strategies, configurable via the `search_type` parameter:
+
+| Mode | Description |
+|---|---|
+| `"semantic"` | Dense vector similarity search (default) |
+| `"bm25"` | Keyword-based BM25 search |
+| `"hybrid"` | BM25 + semantic merged with Reciprocal Rank Fusion (RRF) |
+
+#### With the Builder API
+
+```python
+from raglight.rag.builder import Builder
+from raglight.config.settings import Settings
+
+rag = (
+    Builder()
+    .with_embeddings(Settings.HUGGINGFACE, model_name="all-MiniLM-L6-v2")
+    .with_vector_store(
+        Settings.CHROMA,
+        persist_directory="./myDb",
+        collection_name="my_collection",
+        search_type=Settings.SEARCH_HYBRID,  # "semantic" | "bm25" | "hybrid"
+        alpha=0.5,                           # weight between semantic and BM25 in RRF
+    )
+    .with_llm(Settings.OLLAMA, model_name="llama3.1:8b")
+    .build_rag(k=5)
+)
+
+rag.vector_store.ingest(data_path="./docs")
+response = rag.generate("What is Reciprocal Rank Fusion?")
+print(response)
+```
+
+#### With the high-level RAGPipeline API
+
+```python
+from raglight.rag.simple_rag_api import RAGPipeline
+from raglight.config.rag_config import RAGConfig
+from raglight.config.vector_store_config import VectorStoreConfig
+from raglight.config.settings import Settings
+from raglight.models.data_source_model import FolderSource
+
+vector_store_config = VectorStoreConfig(
+    embedding_model=Settings.DEFAULT_EMBEDDINGS_MODEL,
+    provider=Settings.HUGGINGFACE,
+    database=Settings.CHROMA,
+    persist_directory="./myDb",
+    collection_name="my_collection",
+    search_type=Settings.SEARCH_HYBRID,   # or SEARCH_SEMANTIC / SEARCH_BM25
+    hybrid_alpha=0.5,
+)
+
+config = RAGConfig(
+    llm="llama3.1:8b",
+    provider=Settings.OLLAMA,
+    k=5,
+    knowledge_base=[FolderSource(path="./docs")],
+)
+
+pipeline = RAGPipeline(config, vector_store_config)
+pipeline.build()
+response = pipeline.generate("Explain the retrieval pipeline")
+print(response)
+```
+
+> **How RRF works**: each search mode returns its own ranked list of documents. RRF assigns a score of `1 / (k + rank)` to each document per list and sums them — documents appearing high in both lists are promoted, while documents unique to one list are kept but ranked lower. This gives the hybrid mode better recall and precision than either mode alone.
+
+> See the full working example in [examples/hybrid_search_example.py](examples/hybrid_search_example.py).
 
 ---
 

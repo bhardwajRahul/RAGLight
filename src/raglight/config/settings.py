@@ -185,6 +185,10 @@ class Settings:
     THINKING_PATTERN = r"<think>(.*?)</think>"
     DEFAULT_K = 5
 
+    SEARCH_SEMANTIC = "semantic"
+    SEARCH_BM25 = "bm25"
+    SEARCH_HYBRID = "hybrid"
+
     DEFAULT_IGNORE_FOLDERS = [
         ".venv",
         "venv",
