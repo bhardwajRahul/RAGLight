@@ -27,6 +27,13 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
   - [Ignore Folders Feature](#ignore-folders-feature-🚫)
   - [Ignore Folders in Configuration Classes](#ignore-folders-in-configuration-classes-🚫)
 
+- [Deploy as a REST API (raglight serve)](#deploy-as-a-rest-api-raglight-serve-🌐)
+
+  - [Start the server](#start-the-server)
+  - [Endpoints](#endpoints)
+  - [Configuration via environment variables](#configuration-via-environment-variables)
+  - [Deploy with Docker Compose](#deploy-with-docker-compose)
+
 - [Environment Variables](#environment-variables)
 
 - [Providers and Databases](#providers-and-databases)
@@ -166,9 +173,115 @@ config = RAGConfig(
 
 See the complete example in [examples/ignore_folders_config_example.py](examples/ignore_folders_config_example.py) for all configuration types.
 
+---
+
+## Deploy as a REST API (raglight serve) 🌐
+
+`raglight serve` starts a **FastAPI** server configured entirely via environment variables — no Python code required.
+
+### Start the server
+
+```bash
+raglight serve
+```
+
+Options :
+
+```
+--host    Host to bind (default: 0.0.0.0)
+--port    Port to listen on (default: 8000)
+--reload  Enable auto-reload for development (default: false)
+--workers Number of worker processes (default: 1)
+```
+
+Example :
+
+```bash
+RAGLIGHT_LLM_MODEL=mistral-small-latest \
+RAGLIGHT_LLM_PROVIDER=Mistral \
+raglight serve --port 8080
+```
+
+### Endpoints
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| `GET` | `/health` | — | `{"status": "ok"}` |
+| `POST` | `/generate` | `{"question": "..."}` | `{"answer": "..."}` |
+| `POST` | `/ingest` | `{"data_path": "...", "file_paths": [...], "github_url": "...", "github_branch": "main"}` | `{"message": "..."}` |
+| `POST` | `/ingest/upload` | `multipart/form-data` — champ `files` (un ou plusieurs fichiers) | `{"message": "..."}` |
+| `GET` | `/collections` | — | `{"collections": [...]}` |
+
+The interactive API documentation (Swagger UI) is automatically available at `http://localhost:8000/docs`.
+
+#### Examples with curl
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Ask a question
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is RAGLight?"}'
+
+# Ingest a local folder
+curl -X POST http://localhost:8000/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"data_path": "./my_documents"}'
+
+# Ingest a GitHub repository
+curl -X POST http://localhost:8000/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"github_url": "https://github.com/Bessouat40/RAGLight", "github_branch": "main"}'
+
+# Upload files directly (multipart)
+curl -X POST http://localhost:8000/ingest/upload \
+  -F "files=@./rapport.pdf" \
+  -F "files=@./notes.txt"
+
+# List collections
+curl http://localhost:8000/collections
+```
+
+### Configuration via environment variables
+
+All server settings are read from `RAGLIGHT_*` environment variables. Copy `examples/serve_example/.env.example` to `.env` and adjust the values.
+
+| Variable | Default | Description |
+|---|---|---|
+| `RAGLIGHT_LLM_MODEL` | `llama3` | LLM model name |
+| `RAGLIGHT_LLM_PROVIDER` | `Ollama` | LLM provider (`Ollama`, `Mistral`, `OpenAI`, `LmStudio`, `GoogleGemini`) |
+| `RAGLIGHT_LLM_API_BASE` | `http://localhost:11434` | LLM API base URL |
+| `RAGLIGHT_EMBEDDINGS_MODEL` | `all-MiniLM-L6-v2` | Embeddings model name |
+| `RAGLIGHT_EMBEDDINGS_PROVIDER` | `HuggingFace` | Embeddings provider (`HuggingFace`, `Ollama`, `OpenAI`, `GoogleGemini`) |
+| `RAGLIGHT_EMBEDDINGS_API_BASE` | `http://localhost:11434` | Embeddings API base URL |
+| `RAGLIGHT_PERSIST_DIR` | `./raglight_db` | Local ChromaDB persistence directory |
+| `RAGLIGHT_COLLECTION` | `default` | ChromaDB collection name |
+| `RAGLIGHT_K` | `5` | Number of documents retrieved per query |
+| `RAGLIGHT_SYSTEM_PROMPT` | *(default prompt)* | Custom system prompt for the LLM |
+| `RAGLIGHT_CHROMA_HOST` | — | Remote Chroma host (leave unset for local storage) |
+| `RAGLIGHT_CHROMA_PORT` | — | Remote Chroma port |
+
+### Deploy with Docker Compose
+
+The quickest way to deploy in production :
+
+```bash
+cd examples/serve_example
+cp .env.example .env   # edit values as needed
+docker-compose up
+```
+
+The `docker-compose.yml` uses `extra_hosts: host.docker.internal:host-gateway` so the container can reach an Ollama instance running on the host machine.
+
+---
+
 ## Environment Variables
 
-You can set several environment vaiables to change **RAGLight** settings :
+You can set several environment variables to change **RAGLight** settings :
+
+**Provider credentials & URLs**
 
 - `MISTRAL_API_KEY` if you want to use Mistral API
 - `OLLAMA_CLIENT_URL` if you have a custom Ollama URL
@@ -176,6 +289,10 @@ You can set several environment vaiables to change **RAGLight** settings :
 - `OPENAI_CLIENT_URL` if you have a custom OpenAI URL or vLLM URL
 - `OPENAI_API_KEY` if you need an OpenAI key
 - `GEMINI_API_KEY` if you need a Google Gemini API key
+
+**REST API server (`raglight serve`)**
+
+See the full list in the [Configuration via environment variables](#configuration-via-environment-variables) section above.
 
 ## Providers and databases
 

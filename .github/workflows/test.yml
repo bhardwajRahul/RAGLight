@@ -2,6 +2,8 @@ name: Run Test
 
 env:
   UV_SYSTEM_PYTHON: 1
+  # Force CPU-only PyTorch in CI to avoid downloading ~2 GB of NVIDIA/CUDA packages
+  UV_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
 
 on:
   push:
