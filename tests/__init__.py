@@ -3,8 +3,15 @@ Stub langgraph.prebuilt.tool_node so that langchain==1.2.0 imports succeed
 even though langgraph==1.0.5 does not expose the expected symbols.
 Loaded automatically by both unittest and pytest before any test module.
 """
+import os
 import sys
 from unittest.mock import MagicMock
+
+# Ensure src/ is first in sys.path so local raglight (including raglight.api)
+# takes precedence over any installed version in site-packages.
+_src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if _src not in sys.path:
+    sys.path.insert(0, _src)
 
 _fake = MagicMock()
 _fake.__name__ = "langgraph.prebuilt.tool_node"
