@@ -58,6 +58,8 @@ class RAGPipeline:
                 collection_name=collection_name,
                 host=vector_store_config.host,
                 port=vector_store_config.port,
+                search_type=vector_store_config.search_type,
+                alpha=vector_store_config.hybrid_alpha,
             )
             .with_llm(
                 provider,
