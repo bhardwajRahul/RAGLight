@@ -1,4 +1,4 @@
 install:
-	uv pip install -r pyproject.toml
+	uv pip install -e .
 test:
 	PYTHONPATH=src python3 -m unittest -v
