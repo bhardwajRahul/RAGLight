@@ -9,19 +9,59 @@ from ..config.vector_store_config import VectorStoreConfig
 
 @dataclass
 class ServerConfig:
-    llm_model: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_LLM_MODEL", Settings.DEFAULT_LLM))
-    llm_provider: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_LLM_PROVIDER", Settings.OLLAMA))
-    llm_api_base: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_LLM_API_BASE", Settings.DEFAULT_OLLAMA_CLIENT))
-    embeddings_model: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_EMBEDDINGS_MODEL", Settings.DEFAULT_EMBEDDINGS_MODEL))
-    embeddings_provider: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_EMBEDDINGS_PROVIDER", Settings.HUGGINGFACE))
-    embeddings_api_base: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_EMBEDDINGS_API_BASE", Settings.DEFAULT_OLLAMA_CLIENT))
-    persist_dir: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_PERSIST_DIR", "./raglight_db"))
-    collection: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_COLLECTION", "default"))
-    k: int = field(default_factory=lambda: int(os.environ.get("RAGLIGHT_K", str(Settings.DEFAULT_K))))
-    system_prompt: str = field(default_factory=lambda: os.environ.get("RAGLIGHT_SYSTEM_PROMPT", Settings.DEFAULT_SYSTEM_PROMPT))
-    chroma_host: Optional[str] = field(default_factory=lambda: os.environ.get("RAGLIGHT_CHROMA_HOST") or None)
+    llm_model: str = field(
+        default_factory=lambda: os.environ.get(
+            "RAGLIGHT_LLM_MODEL", Settings.DEFAULT_LLM
+        )
+    )
+    llm_provider: str = field(
+        default_factory=lambda: os.environ.get("RAGLIGHT_LLM_PROVIDER", Settings.OLLAMA)
+    )
+    llm_api_base: str = field(
+        default_factory=lambda: os.environ.get(
+            "RAGLIGHT_LLM_API_BASE", Settings.DEFAULT_OLLAMA_CLIENT
+        )
+    )
+    embeddings_model: str = field(
+        default_factory=lambda: os.environ.get(
+            "RAGLIGHT_EMBEDDINGS_MODEL", Settings.DEFAULT_EMBEDDINGS_MODEL
+        )
+    )
+    embeddings_provider: str = field(
+        default_factory=lambda: os.environ.get(
+            "RAGLIGHT_EMBEDDINGS_PROVIDER", Settings.HUGGINGFACE
+        )
+    )
+    embeddings_api_base: str = field(
+        default_factory=lambda: os.environ.get(
+            "RAGLIGHT_EMBEDDINGS_API_BASE", Settings.DEFAULT_OLLAMA_CLIENT
+        )
+    )
+    persist_dir: str = field(
+        default_factory=lambda: os.environ.get("RAGLIGHT_PERSIST_DIR", "./raglight_db")
+    )
+    collection: str = field(
+        default_factory=lambda: os.environ.get("RAGLIGHT_COLLECTION", "default")
+    )
+    k: int = field(
+        default_factory=lambda: int(
+            os.environ.get("RAGLIGHT_K", str(Settings.DEFAULT_K))
+        )
+    )
+    system_prompt: str = field(
+        default_factory=lambda: os.environ.get(
+            "RAGLIGHT_SYSTEM_PROMPT", Settings.DEFAULT_SYSTEM_PROMPT
+        )
+    )
+    chroma_host: Optional[str] = field(
+        default_factory=lambda: os.environ.get("RAGLIGHT_CHROMA_HOST") or None
+    )
     chroma_port: Optional[int] = field(
-        default_factory=lambda: int(os.environ.get("RAGLIGHT_CHROMA_PORT")) if os.environ.get("RAGLIGHT_CHROMA_PORT") else None
+        default_factory=lambda: (
+            int(os.environ.get("RAGLIGHT_CHROMA_PORT"))
+            if os.environ.get("RAGLIGHT_CHROMA_PORT")
+            else None
+        )
     )
 
     def to_rag_config(self) -> RAGConfig:

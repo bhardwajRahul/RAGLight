@@ -15,7 +15,7 @@ class BM25Index:
         self._bm25: Optional[BM25Okapi] = None
 
     def _tokenize(self, text: str) -> List[str]:
-        return re.findall(r'\w+', text.lower())
+        return re.findall(r"\w+", text.lower())
 
     def _rebuild(self) -> None:
         if self.corpus:
