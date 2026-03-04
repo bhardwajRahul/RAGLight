@@ -615,7 +615,9 @@ def interactive_chat_command():
 def serve_command(
     host: str = typer.Option("0.0.0.0", "--host", help="Host to bind"),
     port: int = typer.Option(8000, "--port", help="Port to listen on"),
-    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (dev mode)"),
+    reload: bool = typer.Option(
+        False, "--reload", help="Enable auto-reload (dev mode)"
+    ),
     workers: int = typer.Option(1, "--workers", help="Number of worker processes"),
 ):
     """
@@ -627,13 +629,19 @@ def serve_command(
     config = ServerConfig()
 
     console.print("[bold magenta]🚀 RAGLight API Server[/bold magenta]")
-    console.print(f"  LLM          : [cyan]{config.llm_provider}[/cyan] / [cyan]{config.llm_model}[/cyan]")
-    console.print(f"  Embeddings   : [cyan]{config.embeddings_provider}[/cyan] / [cyan]{config.embeddings_model}[/cyan]")
+    console.print(
+        f"  LLM          : [cyan]{config.llm_provider}[/cyan] / [cyan]{config.llm_model}[/cyan]"
+    )
+    console.print(
+        f"  Embeddings   : [cyan]{config.embeddings_provider}[/cyan] / [cyan]{config.embeddings_model}[/cyan]"
+    )
     console.print(f"  Persist dir  : [cyan]{config.persist_dir}[/cyan]")
     console.print(f"  Collection   : [cyan]{config.collection}[/cyan]")
     console.print(f"  k            : [cyan]{config.k}[/cyan]")
     if config.chroma_host:
-        console.print(f"  Chroma       : [cyan]{config.chroma_host}:{config.chroma_port}[/cyan]")
+        console.print(
+            f"  Chroma       : [cyan]{config.chroma_host}:{config.chroma_port}[/cyan]"
+        )
     console.print(f"\n[bold green]Listening on http://{host}:{port}[/bold green]\n")
 
     uvicorn.run(

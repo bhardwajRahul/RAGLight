@@ -146,7 +146,9 @@ class ChromaVS(VectorStore):
                 docs.append(Document(page_content=self._bm25.corpus[idx]))
         return docs
 
-    def _rrf(self, ranked_lists: List[List[Document]], k_rrf: int = 60) -> List[Document]:
+    def _rrf(
+        self, ranked_lists: List[List[Document]], k_rrf: int = 60
+    ) -> List[Document]:
         scores: Dict[str, float] = {}
         doc_map: Dict[str, Document] = {}
         for ranked in ranked_lists:
@@ -161,7 +163,9 @@ class ChromaVS(VectorStore):
         self, question: str, k: int, filter: Optional[Dict[str, Any]]
     ) -> List[Document]:
         fetch_k = k * 2
-        semantic_docs = self._query_collection(self.collection, question, fetch_k, filter)
+        semantic_docs = self._query_collection(
+            self.collection, question, fetch_k, filter
+        )
         bm25_docs = self._bm25_search(question, fetch_k)
         return self._rrf([semantic_docs, bm25_docs])[:k]
 
