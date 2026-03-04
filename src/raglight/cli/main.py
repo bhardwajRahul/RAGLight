@@ -611,5 +611,40 @@ def interactive_chat_command():
         raise typer.Exit(code=1)
 
 
+@app.command(name="serve")
+def serve_command(
+    host: str = typer.Option("0.0.0.0", "--host", help="Host to bind"),
+    port: int = typer.Option(8000, "--port", help="Port to listen on"),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (dev mode)"),
+    workers: int = typer.Option(1, "--workers", help="Number of worker processes"),
+):
+    """
+    Start the RAGLight REST API server (configured via RAGLIGHT_* env vars).
+    """
+    import uvicorn
+    from raglight.api.server_config import ServerConfig
+
+    config = ServerConfig()
+
+    console.print("[bold magenta]🚀 RAGLight API Server[/bold magenta]")
+    console.print(f"  LLM          : [cyan]{config.llm_provider}[/cyan] / [cyan]{config.llm_model}[/cyan]")
+    console.print(f"  Embeddings   : [cyan]{config.embeddings_provider}[/cyan] / [cyan]{config.embeddings_model}[/cyan]")
+    console.print(f"  Persist dir  : [cyan]{config.persist_dir}[/cyan]")
+    console.print(f"  Collection   : [cyan]{config.collection}[/cyan]")
+    console.print(f"  k            : [cyan]{config.k}[/cyan]")
+    if config.chroma_host:
+        console.print(f"  Chroma       : [cyan]{config.chroma_host}:{config.chroma_port}[/cyan]")
+    console.print(f"\n[bold green]Listening on http://{host}:{port}[/bold green]\n")
+
+    uvicorn.run(
+        "raglight.api.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=reload,
+        workers=workers if not reload else 1,
+    )
+
+
 if __name__ == "__main__":
     app()

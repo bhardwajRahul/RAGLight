@@ -34,7 +34,7 @@ class Settings:
     MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
     LMSTUDIO = "LmStudio"
     HUGGINGFACE = "HuggingFace"
-    DEFAULT_LLM = "llama3"
+    DEFAULT_LLM = "llama3.2:1b"
     DEFAULT_OPENAI_CLIENT = os.environ.get(
         "OPENAI_CLIENT_URL", "https://api.openai.com/v1"
     )

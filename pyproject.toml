@@ -7,18 +7,15 @@ authors = [
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "mistralai==1.5.0",
-    "typing==3.7.4.3",
-    "litellm==1.61.15",
     "typer==0.16.0",
     "rich==14.0.0",
     "quo==2023.5.1",
     "questionary==2.0.1",
     "python-dotenv>=1.1.1",
     "pydantic>=2.11.7",
-    "black>=25.12.0",
     "langchain==1.2.0",
     "langchain-text-splitters==1.1.0",
     "langchain-core==1.2.5",
@@ -37,9 +34,15 @@ dependencies = [
     "typing-extensions==4.15.0",
     "nltk>=3.9.2",
     "rank_bm25>=0.2.2",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "python-multipart>=0.0.9",
 ]
 [project.scripts]
 raglight = "raglight.cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.uv.workspace]
 members = [
@@ -52,4 +55,5 @@ raglight = { workspace = true }
 [dependency-groups]
 dev = [
     "raglight",
+    "black>=25.12.0",
 ]
