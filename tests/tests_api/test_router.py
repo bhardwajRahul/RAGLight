@@ -69,7 +69,8 @@ def test_ingest_local(client, pipeline):
 def test_ingest_missing_params(client):
     response = client.post("/ingest", json={})
     assert response.status_code == 400
-    assert "data_path" in response.json()["detail"] or "github_url" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert any(k in detail for k in ("data_path", "file_paths", "github_url"))
 
 
 def test_ingest_github(client, pipeline):
@@ -93,6 +94,56 @@ def test_ingest_github(client, pipeline):
 
 
 # ── /collections ──────────────────────────────────────────────────────────────
+
+def test_ingest_file_paths(client, pipeline):
+    vector_store = pipeline.get_vector_store.return_value
+    vector_store.add_documents.return_value = None
+    vector_store.add_class_documents.return_value = None
+    vector_store._flatten_metadata.side_effect = lambda docs: docs
+    vector_store._process_file = lambda fp, factory, flatten: (["chunk"], [])
+
+    with patch("os.path.isfile", return_value=True):
+        response = client.post(
+            "/ingest",
+            json={"file_paths": ["/some/file.pdf", "/some/other.txt"]},
+        )
+
+    assert response.status_code == 200
+    assert "success" in response.json()["message"].lower()
+
+
+def test_ingest_upload(client, pipeline):
+    vector_store = pipeline.get_vector_store.return_value
+    vector_store.add_documents.return_value = None
+    vector_store.add_class_documents.return_value = None
+    vector_store._flatten_metadata.side_effect = lambda docs: docs
+    vector_store._process_file = lambda fp, factory, flatten: (["chunk"], [])
+
+    response = client.post(
+        "/ingest/upload",
+        files=[
+            ("files", ("doc1.txt", b"hello world", "text/plain")),
+            ("files", ("doc2.txt", b"another doc", "text/plain")),
+        ],
+    )
+    assert response.status_code == 200
+    assert "2 file(s)" in response.json()["message"]
+
+
+def test_ingest_upload_no_files(client):
+    response = client.post("/ingest/upload", files=[])
+    assert response.status_code in (400, 422)
+
+
+def test_ingest_file_paths_missing_file(client, pipeline):
+    with patch("os.path.isfile", return_value=False):
+        response = client.post(
+            "/ingest",
+            json={"file_paths": ["/nonexistent/file.pdf"]},
+        )
+    assert response.status_code == 500
+    assert "not found" in response.json()["detail"].lower()
+
 
 def test_collections(client, pipeline):
     vector_store = pipeline.get_vector_store.return_value

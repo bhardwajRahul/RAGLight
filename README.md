@@ -208,7 +208,8 @@ raglight serve --port 8080
 |---|---|---|---|
 | `GET` | `/health` | — | `{"status": "ok"}` |
 | `POST` | `/generate` | `{"question": "..."}` | `{"answer": "..."}` |
-| `POST` | `/ingest` | `{"data_path": "...", "github_url": "...", "github_branch": "main"}` | `{"message": "..."}` |
+| `POST` | `/ingest` | `{"data_path": "...", "file_paths": [...], "github_url": "...", "github_branch": "main"}` | `{"message": "..."}` |
+| `POST` | `/ingest/upload` | `multipart/form-data` — champ `files` (un ou plusieurs fichiers) | `{"message": "..."}` |
 | `GET` | `/collections` | — | `{"collections": [...]}` |
 
 The interactive API documentation (Swagger UI) is automatically available at `http://localhost:8000/docs`.
@@ -233,6 +234,11 @@ curl -X POST http://localhost:8000/ingest \
 curl -X POST http://localhost:8000/ingest \
   -H "Content-Type: application/json" \
   -d '{"github_url": "https://github.com/Bessouat40/RAGLight", "github_branch": "main"}'
+
+# Upload files directly (multipart)
+curl -X POST http://localhost:8000/ingest/upload \
+  -F "files=@./rapport.pdf" \
+  -F "files=@./notes.txt"
 
 # List collections
 curl http://localhost:8000/collections

@@ -60,6 +60,7 @@ class Builder:
         """
         logging.info("⏳ Creating an Embeddings Model...")
         if type == Settings.HUGGINGFACE:
+            kwargs.pop("api_base", None)
             self.embeddings = HuggingfaceEmbeddingsModel(**kwargs)
         elif type == Settings.OLLAMA:
             self.embeddings = OllamaEmbeddingsModel(**kwargs)

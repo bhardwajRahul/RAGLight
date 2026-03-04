@@ -10,13 +10,10 @@ from raglight.config.settings import Settings
 
 
 def test_defaults():
-    with patch.dict(os.environ, {}, clear=False):
-        # Remove RAGLIGHT_* vars if present
-        env_overrides = {k: "" for k in os.environ if k.startswith("RAGLIGHT_")}
-        for k in env_overrides:
-            os.environ.pop(k, None)
+    clean_env = {k: v for k, v in os.environ.items() if not k.startswith("RAGLIGHT_")}
+    with patch.dict(os.environ, clean_env, clear=True):
         cfg = ServerConfig()
-    assert cfg.llm_model == "llama3"
+    assert cfg.llm_model == Settings.DEFAULT_LLM
     assert cfg.llm_provider == Settings.OLLAMA
     assert cfg.embeddings_model == Settings.DEFAULT_EMBEDDINGS_MODEL
     assert cfg.embeddings_provider == Settings.HUGGINGFACE
