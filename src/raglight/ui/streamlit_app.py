@@ -127,23 +127,6 @@ with st.sidebar:
 
     st.divider()
 
-    col_title, col_refresh = st.columns([4, 1])
-    with col_title:
-        st.markdown("**📚 Knowledge sources**")
-    with col_refresh:
-        if st.button("↺", help="Refresh sources"):
-            fetch_collections.clear()
-            st.rerun()
-
-    collections = fetch_collections()
-    if collections:
-        pills = "".join(f'<span class="source-pill">{c}</span>' for c in collections)
-        st.markdown(pills, unsafe_allow_html=True)
-    else:
-        st.caption("No collections yet.")
-
-    st.divider()
-
     if st.button("🗑 Clear conversation", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
