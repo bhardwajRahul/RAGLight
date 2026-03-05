@@ -3,7 +3,6 @@ import typer
 from pathlib import Path
 import logging
 import os
-import questionary
 import shutil
 from typing import List, Optional, Tuple
 
@@ -48,11 +47,11 @@ def download_nltk_resources_if_needed():
 
 console = Console()
 
-custom_style = questionary.Style(
-    [
-        ("answer", "bold ansicyan"),
-    ]
-)
+
+def simple_select(message: str, choices: List[str], default: Optional[str] = None) -> str:
+    """Prompt the user to select from a list using arrow keys."""
+    from InquirerPy import inquirer
+    return inquirer.select(message=message, choices=choices, default=default).execute()
 
 
 def prompt_input():
@@ -72,8 +71,8 @@ def print_llm_response(response: str):
 
 
 def select_with_arrows(message, choices, default=None):
-    """Prompt the user to select from a list using arrow keys."""
-    return questionary.select(message, choices=choices, default=default).ask()
+    """Prompt the user to select from a list."""
+    return simple_select(message, choices, default)
 
 
 def prompt_local_source() -> Path:
@@ -112,12 +111,11 @@ def prompt_github_sources() -> List[GitHubSource]:
 
 def prompt_data_sources() -> Tuple[Optional[Path], List[GitHubSource]]:
     console.print("[bold cyan]\n--- 📂 Step 1: Data Source ---[/bold cyan]")
-    source_type = questionary.select(
+    source_type = simple_select(
         "Which knowledge source do you want to use?",
         choices=["Local folder", "GitHub repositories"],
         default="Local folder",
-        style=custom_style,
-    ).ask()
+    )
 
     if source_type == "Local folder":
         return prompt_local_source(), []
@@ -240,7 +238,7 @@ def interactive_chat_command():
     )
 
     console.print("[bold blue]\n--- 🧠 Step 3: Embeddings Model ---[/bold blue]")
-    emb_provider = questionary.select(
+    emb_provider = simple_select(
         "Which embeddings provider do you want to use?",
         choices=[
             Settings.HUGGINGFACE,
@@ -249,8 +247,7 @@ def interactive_chat_command():
             Settings.GOOGLE_GEMINI,
         ],
         default=Settings.HUGGINGFACE,
-        style=custom_style,
-    ).ask()
+    )
 
     default_api_base = None
     if emb_provider == Settings.OLLAMA:
@@ -270,7 +267,7 @@ def interactive_chat_command():
     )
 
     console.print("[bold blue]\n--- 🤖 Step 4: Language Model (LLM) ---[/bold blue]")
-    llm_provider = questionary.select(
+    llm_provider = simple_select(
         "Which LLM provider do you want to use?",
         choices=[
             Settings.OLLAMA,
@@ -280,8 +277,7 @@ def interactive_chat_command():
             Settings.GOOGLE_GEMINI,
         ],
         default=Settings.OLLAMA,
-        style=custom_style,
-    ).ask()
+    )
 
     llm_default_api_base = None
     if llm_provider == Settings.OLLAMA:
@@ -302,12 +298,11 @@ def interactive_chat_command():
         "[bold]Which LLM do you want to use?[/bold]",
         default=Settings.DEFAULT_LLM,
     )
-    k = questionary.select(
+    k = simple_select(
         "How many documents should be retrieved for context (k)?",
         choices=["5", "10", "15"],
         default=str(Settings.DEFAULT_K),
-        style=custom_style,
-    ).ask()
+    )
     k = int(k)
 
     console.print("[bold green]\n✅ Configuration complete![/bold green]")
@@ -454,7 +449,7 @@ def interactive_chat_command():
     )
 
     console.print("[bold blue]\n--- 🧠 Step 3: Embeddings Model ---[/bold blue]")
-    emb_provider = questionary.select(
+    emb_provider = simple_select(
         "Which embeddings provider do you want to use?",
         choices=[
             Settings.HUGGINGFACE,
@@ -463,8 +458,7 @@ def interactive_chat_command():
             Settings.GOOGLE_GEMINI,
         ],
         default=Settings.HUGGINGFACE,
-        style=custom_style,
-    ).ask()
+    )
 
     default_api_base = None
     if emb_provider == Settings.OLLAMA:
@@ -484,7 +478,7 @@ def interactive_chat_command():
     )
 
     console.print("[bold blue]\n--- 🤖 Step 4: Language Model (LLM) ---[/bold blue]")
-    llm_provider = questionary.select(
+    llm_provider = simple_select(
         "Which LLM provider do you want to use?",
         choices=[
             Settings.OLLAMA,
@@ -494,8 +488,7 @@ def interactive_chat_command():
             Settings.GOOGLE_GEMINI,
         ],
         default=Settings.OLLAMA,
-        style=custom_style,
-    ).ask()
+    )
 
     api_key = None
     llm_default_api_base = None
@@ -519,12 +512,11 @@ def interactive_chat_command():
         "[bold]Which LLM do you want to use?[/bold]",
         default=Settings.DEFAULT_LLM,
     )
-    k = questionary.select(
+    k = simple_select(
         "How many documents should be retrieved for context (k)?",
         choices=["5", "10", "15"],
         default=str(Settings.DEFAULT_K),
-        style=custom_style,
-    ).ask()
+    )
     k = int(k)
 
     console.print("[bold green]\n✅ Configuration complete![/bold green]")

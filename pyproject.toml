@@ -13,7 +13,7 @@ dependencies = [
     "typer==0.16.0",
     "rich==14.0.0",
     "quo==2023.5.1",
-    "questionary==2.0.1",
+    "InquirerPy==0.3.4",
     "python-dotenv==1.1.1",
     "pydantic==2.11.7",
     "langchain==1.2.0",
