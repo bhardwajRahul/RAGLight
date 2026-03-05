@@ -1,6 +1,6 @@
 [project]
 name = "raglight"
-version = "2.10.1"
+version = "3.0.0"
 description = "RAGLight is a lightweight and modular Python library for implementing Retrieval-Augmented Generation (RAG). It enhances the capabilities of Large Language Models (LLMs) by combining document retrieval with natural language inference."
 authors = [
     {name = "Bessouat40",email = "roman.bessouat@orange.fr"}
@@ -14,8 +14,8 @@ dependencies = [
     "rich==14.0.0",
     "quo==2023.5.1",
     "questionary==2.0.1",
-    "python-dotenv>=1.1.1",
-    "pydantic>=2.11.7",
+    "python-dotenv==1.1.1",
+    "pydantic==2.11.7",
     "langchain==1.2.0",
     "langchain-text-splitters==1.1.0",
     "langchain-core==1.2.5",
@@ -23,20 +23,21 @@ dependencies = [
     "chromadb==0.5.23",
     "sentence-transformers==5.1.2",
     "pymupdf==1.26.7",
-    "ollama>=0.6.1",
+    "ollama==0.6.1",
     "langchain-ollama==1.0.1",
-    "langchain-openai>=1.1.6",
-    "langchain-mistralai>=1.1.1",
-    "google-genai>=1.57.0",
-    "langchain-google-genai>=4.1.3",
+    "langchain-openai==1.1.6",
+    "langchain-mistralai==1.1.1",
+    "google-genai==1.57.0",
+    "langchain-google-genai==4.1.3",
     "langchain-mcp-adapters==0.2.1",
-    "nest-asyncio>=1.6.0",
+    "nest-asyncio==1.6.0",
     "typing-extensions==4.15.0",
-    "nltk>=3.9.2",
-    "rank_bm25>=0.2.2",
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.34.0",
-    "python-multipart>=0.0.9",
+    "nltk==3.9.2",
+    "rank_bm25==0.2.2",
+    "fastapi==0.128.0",
+    "uvicorn[standard]==0.35.0",
+    "python-multipart==0.0.20",
+    "streamlit>=1.40.0",
 ]
 [project.scripts]
 raglight = "raglight.cli.main:app"
