@@ -618,7 +618,9 @@ def interactive_chat_command():
 def serve_command(
     host: str = typer.Option("0.0.0.0", "--host", help="Host to bind"),
     port: int = typer.Option(8000, "--port", help="Port to listen on"),
-    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (dev mode)"),
+    reload: bool = typer.Option(
+        False, "--reload", help="Enable auto-reload (dev mode)"
+    ),
     workers: int = typer.Option(1, "--workers", help="Number of worker processes"),
     ui: bool = typer.Option(False, "--ui", help="Start Streamlit UI alongside the API"),
     ui_port: int = typer.Option(8501, "--ui-port", help="Port for the Streamlit UI"),
@@ -671,9 +673,15 @@ def serve_command(
     streamlit_app = str(Path(__file__).parent.parent / "ui" / "streamlit_app.py")
 
     uvicorn_cmd = [
-        sys.executable, "-m", "uvicorn",
-        "raglight.api.app:create_app", "--factory",
-        "--host", host, "--port", str(port),
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "raglight.api.app:create_app",
+        "--factory",
+        "--host",
+        host,
+        "--port",
+        str(port),
     ]
     if reload:
         uvicorn_cmd.append("--reload")
@@ -681,11 +689,20 @@ def serve_command(
         uvicorn_cmd += ["--workers", str(workers)]
 
     api_proc = subprocess.Popen(uvicorn_cmd, env=env)
-    ui_proc = subprocess.Popen([
-        sys.executable, "-m", "streamlit", "run", streamlit_app,
-        "--server.port", str(ui_port),
-        "--server.headless", "true",
-    ], env=env)
+    ui_proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            streamlit_app,
+            "--server.port",
+            str(ui_port),
+            "--server.headless",
+            "true",
+        ],
+        env=env,
+    )
 
     def _shutdown(sig, frame):
         api_proc.terminate()

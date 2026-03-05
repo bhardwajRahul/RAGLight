@@ -13,7 +13,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown("""
+st.markdown(
+    """
 <style>
 #MainMenu, footer, header { visibility: hidden; }
 
@@ -46,7 +47,9 @@ section[data-testid="stSidebar"] hr { border-color: #1e293b; }
     color: #94a3b8;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -57,6 +60,7 @@ def api_health() -> bool:
     except Exception:
         return False
 
+
 @st.cache_data(ttl=30)
 def fetch_collections() -> list:
     try:
@@ -66,6 +70,7 @@ def fetch_collections() -> list:
     except Exception:
         return []
 
+
 # NOUVEAU: Fonction générateur pour le streaming de la réponse
 def stream_response(prompt: str):
     """
@@ -74,13 +79,19 @@ def stream_response(prompt: str):
     """
     try:
         # Note: Adapte le endpoint si nécessaire (ex: /generate_stream)
-        with requests.post(f"{API_URL}/generate", json={"question": prompt}, stream=True, timeout=API_TIMEOUT) as r:
+        with requests.post(
+            f"{API_URL}/generate",
+            json={"question": prompt},
+            stream=True,
+            timeout=API_TIMEOUT,
+        ) as r:
             r.raise_for_status()
             for chunk in r.iter_content(chunk_size=1024, decode_unicode=True):
                 if chunk:
                     yield chunk
     except Exception as e:
         yield f"⚠️ Erreur: {str(e)}"
+
 
 # ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
@@ -92,20 +103,26 @@ with st.sidebar:
     st.markdown("# ⚡ RAGLight")
 
     healthy = api_health()
-    st.caption(f"{'🟢' if healthy else '🔴'} {'Connected' if healthy else 'Unreachable'} · {API_URL}")
+    st.caption(
+        f"{'🟢' if healthy else '🔴'} {'Connected' if healthy else 'Unreachable'} · {API_URL}"
+    )
 
     st.divider()
 
     st.markdown("**📥 Import knowledge**")
 
     with st.expander("Upload files", expanded=True):
-        uploaded = st.file_uploader("files", accept_multiple_files=True, label_visibility="collapsed")
+        uploaded = st.file_uploader(
+            "files", accept_multiple_files=True, label_visibility="collapsed"
+        )
         if st.button("Ingest files", use_container_width=True, disabled=not uploaded):
             with st.spinner("Ingesting…"):
                 # ATTENTION: f.getvalue() met tout en RAM. OK pour les petits fichiers.
                 files = [("files", (f.name, f.getvalue())) for f in uploaded]
                 try:
-                    r = requests.post(f"{API_URL}/ingest/upload", files=files, timeout=300)
+                    r = requests.post(
+                        f"{API_URL}/ingest/upload", files=files, timeout=300
+                    )
                     r.raise_for_status()
                     st.success(r.json().get("message", "Files ingested successfully"))
                     fetch_collections.clear()
@@ -114,13 +131,21 @@ with st.sidebar:
 
     with st.expander("Add a directory", expanded=False):
         st.caption("Path on the machine running the server")
-        dir_path = st.text_input("dir", placeholder="/path/to/my/docs", label_visibility="collapsed")
-        if st.button("Ingest directory", use_container_width=True, disabled=not dir_path):
+        dir_path = st.text_input(
+            "dir", placeholder="/path/to/my/docs", label_visibility="collapsed"
+        )
+        if st.button(
+            "Ingest directory", use_container_width=True, disabled=not dir_path
+        ):
             with st.spinner("Ingesting…"):
                 try:
-                    r = requests.post(f"{API_URL}/ingest", json={"data_path": dir_path}, timeout=300)
+                    r = requests.post(
+                        f"{API_URL}/ingest", json={"data_path": dir_path}, timeout=300
+                    )
                     r.raise_for_status()
-                    st.success(r.json().get("message", "Directory ingested successfully"))
+                    st.success(
+                        r.json().get("message", "Directory ingested successfully")
+                    )
                     fetch_collections.clear()
                 except Exception as e:
                     st.error(str(e))
@@ -134,7 +159,8 @@ with st.sidebar:
 
 # ── Chat ──────────────────────────────────────────────────────────────────────
 if not st.session_state.messages:
-    st.markdown("""
+    st.markdown(
+        """
     <div style="text-align:center; padding-top:12vh; color:#6b7280">
         <div style="font-size:2.5rem">⚡</div>
         <div style="font-size:1.8rem; font-weight:700; color:#111827; margin:0.5rem 0">
@@ -144,7 +170,9 @@ if not st.session_state.messages:
             Ask anything about your documents,<br>or import knowledge from the sidebar.
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 else:
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
@@ -160,17 +188,21 @@ if prompt := st.chat_input("Message RAGLight…", disabled=not healthy):
     with st.chat_message("assistant"):
         # OPTION A: Rendu avec Streaming (recommandé si ton API le supporte)
         # full_response = st.write_stream(stream_response(prompt))
-        
+
         # OPTION B: Ton code d'origine (Bloquant) - Actif par défaut ici
         with st.spinner("Thinking..."):
             try:
                 # Utilisation de la nouvelle variable API_TIMEOUT
-                r = requests.post(f"{API_URL}/generate", json={"question": prompt}, timeout=API_TIMEOUT)
+                r = requests.post(
+                    f"{API_URL}/generate",
+                    json={"question": prompt},
+                    timeout=API_TIMEOUT,
+                )
                 r.raise_for_status()
                 full_response = r.json()["answer"]
             except Exception as e:
                 full_response = f"⚠️ {e}"
-        
+
         st.markdown(full_response)
 
     # 3. Sauvegarder la réponse dans l'historique
