@@ -17,5 +17,5 @@ class VectorStoreConfig:
     ignore_folders: list = field(
         default_factory=lambda: list(Settings.DEFAULT_IGNORE_FOLDERS)
     )
-    search_type: str = field(default=Settings.SEARCH_SEMANTIC)
+    search_type: str = field(default=Settings.SEARCH_HYBRID)
     hybrid_alpha: float = 0.5

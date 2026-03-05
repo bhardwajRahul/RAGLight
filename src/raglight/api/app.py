@@ -1,3 +1,9 @@
+import logging
+import os
+
+# Disable ChromaDB telemetry before chromadb is imported
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -6,6 +12,21 @@ from fastapi import FastAPI
 from ..rag.simple_rag_api import RAGPipeline
 from .router import create_router
 from .server_config import ServerConfig
+
+# Silence noisy third-party loggers (runs in the uvicorn subprocess, where CLI callback() never fires)
+for _logger_name in [
+    "telemetry",
+    "langchain",
+    "langchain_core",
+    "langchain_core.tracing",
+    "httpx",
+    "urllib3",
+    "requests",
+    "chromadb",
+    "chromadb.telemetry",
+    "chromadb.telemetry.product.posthog",
+]:
+    logging.getLogger(_logger_name).setLevel(logging.CRITICAL + 1)
 
 
 def create_app(config: Optional[ServerConfig] = None) -> FastAPI:

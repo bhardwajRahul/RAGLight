@@ -158,6 +158,7 @@ def callback():
     RAGLight CLI application.
     """
     Settings.setup_logging()
+    os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
     for name in [
         "telemetry",
         "langchain",
@@ -167,6 +168,8 @@ def callback():
         "urllib3",
         "requests",
         "chromadb",
+        "chromadb.telemetry",
+        "chromadb.telemetry.product.posthog",
     ]:
         logger = logging.getLogger(name)
         logger.setLevel(logging.CRITICAL + 1)
@@ -615,18 +618,23 @@ def interactive_chat_command():
 def serve_command(
     host: str = typer.Option("0.0.0.0", "--host", help="Host to bind"),
     port: int = typer.Option(8000, "--port", help="Port to listen on"),
-    reload: bool = typer.Option(
-        False, "--reload", help="Enable auto-reload (dev mode)"
-    ),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (dev mode)"),
     workers: int = typer.Option(1, "--workers", help="Number of worker processes"),
+    ui: bool = typer.Option(False, "--ui", help="Start Streamlit UI alongside the API"),
+    ui_port: int = typer.Option(8501, "--ui-port", help="Port for the Streamlit UI"),
 ):
     """
     Start the RAGLight REST API server (configured via RAGLIGHT_* env vars).
+    Use --ui to also launch the Streamlit chat interface.
     """
+    import signal
+    import subprocess
+    import sys
     import uvicorn
     from raglight.api.server_config import ServerConfig
 
     config = ServerConfig()
+    display_host = "localhost" if host == "0.0.0.0" else host
 
     console.print("[bold magenta]🚀 RAGLight API Server[/bold magenta]")
     console.print(
@@ -642,16 +650,52 @@ def serve_command(
         console.print(
             f"  Chroma       : [cyan]{config.chroma_host}:{config.chroma_port}[/cyan]"
         )
-    console.print(f"\n[bold green]Listening on http://{host}:{port}[/bold green]\n")
 
-    uvicorn.run(
-        "raglight.api.app:create_app",
-        factory=True,
-        host=host,
-        port=port,
-        reload=reload,
-        workers=workers if not reload else 1,
-    )
+    if not ui:
+        console.print(f"\n[bold green]Listening on http://{host}:{port}[/bold green]\n")
+        uvicorn.run(
+            "raglight.api.app:create_app",
+            factory=True,
+            host=host,
+            port=port,
+            reload=reload,
+            workers=workers if not reload else 1,
+        )
+        return
+
+    console.print(f"\n  API  →  [bold green]http://{display_host}:{port}[/bold green]")
+    console.print(f"  UI   →  [bold cyan]http://{display_host}:{ui_port}[/bold cyan]\n")
+
+    env = {**os.environ, "RAGLIGHT_API_URL": f"http://localhost:{port}"}
+
+    streamlit_app = str(Path(__file__).parent.parent / "ui" / "streamlit_app.py")
+
+    uvicorn_cmd = [
+        sys.executable, "-m", "uvicorn",
+        "raglight.api.app:create_app", "--factory",
+        "--host", host, "--port", str(port),
+    ]
+    if reload:
+        uvicorn_cmd.append("--reload")
+    elif workers > 1:
+        uvicorn_cmd += ["--workers", str(workers)]
+
+    api_proc = subprocess.Popen(uvicorn_cmd, env=env)
+    ui_proc = subprocess.Popen([
+        sys.executable, "-m", "streamlit", "run", streamlit_app,
+        "--server.port", str(ui_port),
+        "--server.headless", "true",
+    ], env=env)
+
+    def _shutdown(sig, frame):
+        api_proc.terminate()
+        ui_proc.terminate()
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
+
+    api_proc.wait()
+    ui_proc.wait()
 
 
 if __name__ == "__main__":

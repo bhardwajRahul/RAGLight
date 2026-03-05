@@ -30,6 +30,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 - [Deploy as a REST API (raglight serve)](#deploy-as-a-rest-api-raglight-serve-🌐)
 
   - [Start the server](#start-the-server)
+  - [Launch the Chat UI](#launch-the-chat-ui-💬)
   - [Endpoints](#endpoints)
   - [Configuration via environment variables](#configuration-via-environment-variables)
   - [Deploy with Docker Compose](#deploy-with-docker-compose)
@@ -190,10 +191,12 @@ raglight serve
 Options :
 
 ```
---host    Host to bind (default: 0.0.0.0)
---port    Port to listen on (default: 8000)
---reload  Enable auto-reload for development (default: false)
---workers Number of worker processes (default: 1)
+--host      Host to bind (default: 0.0.0.0)
+--port      Port to listen on (default: 8000)
+--reload    Enable auto-reload for development (default: false)
+--workers   Number of worker processes (default: 1)
+--ui        Launch the Streamlit chat UI alongside the API (default: false)
+--ui-port   Port for the Streamlit UI (default: 8501)
 ```
 
 Example :
@@ -203,6 +206,32 @@ RAGLIGHT_LLM_MODEL=mistral-small-latest \
 RAGLIGHT_LLM_PROVIDER=Mistral \
 raglight serve --port 8080
 ```
+
+### Launch the Chat UI 💬
+
+Add `--ui` to start a **Streamlit chat interface** alongside the REST API — no extra setup required:
+
+```bash
+raglight serve --ui
+```
+
+| Address | Service |
+|---|---|
+| `http://localhost:8000` | REST API + Swagger (`/docs`) |
+| `http://localhost:8501` | Streamlit chat UI |
+
+The UI lets you:
+- **Chat** with your documents — full conversation history, markdown rendering
+- **Upload files** directly from the browser (PDF, TXT, code…)
+- **Ingest a directory** by providing a path on the server machine
+
+Use `--ui-port` to change the Streamlit port:
+
+```bash
+raglight serve --ui --port 8000 --ui-port 3000
+```
+
+Both processes share the same configuration (env vars) and are terminated together when you stop the server.
 
 ### Endpoints
 
