@@ -48,9 +48,12 @@ def download_nltk_resources_if_needed():
 console = Console()
 
 
-def simple_select(message: str, choices: List[str], default: Optional[str] = None) -> str:
+def simple_select(
+    message: str, choices: List[str], default: Optional[str] = None
+) -> str:
     """Prompt the user to select from a list using arrow keys."""
     from InquirerPy import inquirer
+
     return inquirer.select(message=message, choices=choices, default=default).execute()
 
 
