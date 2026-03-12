@@ -1,8 +1,11 @@
 import asyncio
 import logging
 import shutil
-import nest_asyncio
 from typing import List
+
+import nest_asyncio
+
+nest_asyncio.apply()
 
 from ..config.vector_store_config import VectorStoreConfig
 from .agentic_rag import AgenticRAG
@@ -67,19 +70,18 @@ class AgenticRAGPipeline:
     def get_vector_store(self) -> VectorStore:
         return self.agenticRag.vector_store
 
+    def clear_history(self) -> None:
+        """Resets the agent's conversation history."""
+        self.agenticRag.clear_history()
+
     def generate(self, question: str, stream: bool = False) -> str:
         """
         Synchronous wrapper for the agent's asynchronous generation.
-        """
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
 
-        if loop.is_running():
-            return loop.run_until_complete(
-                self.agenticRag.generate(question, stream=stream)
-            )
-        else:
-            return asyncio.run(self.agenticRag.generate(question, stream=stream))
+        Works correctly in all contexts (scripts, Jupyter notebooks, FastAPI)
+        thanks to nest_asyncio applied at import time.
+        """
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(
+            self.agenticRag.generate(question, stream=stream)
+        )
