@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import requests
 import streamlit as st
 
@@ -61,6 +62,21 @@ def api_health() -> bool:
         return False
 
 
+LLM_PROVIDERS = ["Ollama", "OpenAI", "LmStudio", "Mistral", "GoogleGemini", "AWSBedrock"]
+# Providers that require an API base URL
+PROVIDERS_WITH_API_BASE = {"Ollama", "OpenAI", "LmStudio", "Mistral"}
+
+
+@st.cache_data(ttl=60)
+def fetch_llm_config() -> dict:
+    try:
+        r = requests.get(f"{API_URL}/config", timeout=5)
+        r.raise_for_status()
+        return r.json()
+    except Exception:
+        return {"llm_provider": "Ollama", "llm_model": "", "llm_api_base": ""}
+
+
 @st.cache_data(ttl=30)
 def fetch_collections() -> list:
     try:
@@ -96,6 +112,10 @@ def stream_response(prompt: str):
 # ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "ingested_files" not in st.session_state:
+    st.session_state.ingested_files = []
+if "upload_key" not in st.session_state:
+    st.session_state.upload_key = 0
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -113,21 +133,32 @@ with st.sidebar:
 
     with st.expander("Upload files", expanded=True):
         uploaded = st.file_uploader(
-            "files", accept_multiple_files=True, label_visibility="collapsed"
+            "files",
+            accept_multiple_files=True,
+            label_visibility="collapsed",
+            key=f"uploader_{st.session_state.upload_key}",
         )
         if st.button("Ingest files", use_container_width=True, disabled=not uploaded):
             with st.spinner("Ingesting…"):
-                # ATTENTION: f.getvalue() met tout en RAM. OK pour les petits fichiers.
                 files = [("files", (f.name, f.getvalue())) for f in uploaded]
                 try:
                     r = requests.post(
                         f"{API_URL}/ingest/upload", files=files, timeout=300
                     )
                     r.raise_for_status()
-                    st.success(r.json().get("message", "Files ingested successfully"))
+                    st.session_state.ingested_files.extend(
+                        [f.name for f in uploaded]
+                    )
+                    st.session_state.upload_key += 1
                     fetch_collections.clear()
+                    st.rerun()
                 except Exception as e:
                     st.error(str(e))
+
+    if st.session_state.ingested_files:
+        st.markdown("**Ingested this session**")
+        for name in st.session_state.ingested_files:
+            st.caption(f"✓ {name}")
 
     with st.expander("Add a directory", expanded=False):
         st.caption("Path on the machine running the server")
@@ -143,10 +174,11 @@ with st.sidebar:
                         f"{API_URL}/ingest", json={"data_path": dir_path}, timeout=300
                     )
                     r.raise_for_status()
-                    st.success(
-                        r.json().get("message", "Directory ingested successfully")
+                    st.session_state.ingested_files.append(
+                        f"📁 {Path(dir_path).name}"
                     )
                     fetch_collections.clear()
+                    st.rerun()
                 except Exception as e:
                     st.error(str(e))
 
@@ -155,6 +187,42 @@ with st.sidebar:
     if st.button("🗑 Clear conversation", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
+
+    st.divider()
+
+    with st.expander("⚙️ Model settings", expanded=False):
+        current_cfg = fetch_llm_config()
+        provider = st.selectbox(
+            "Provider",
+            LLM_PROVIDERS,
+            index=LLM_PROVIDERS.index(current_cfg.get("llm_provider", "Ollama"))
+            if current_cfg.get("llm_provider") in LLM_PROVIDERS
+            else 0,
+        )
+        model = st.text_input("Model", value=current_cfg.get("llm_model", ""))
+        if provider in PROVIDERS_WITH_API_BASE:
+            api_base = st.text_input(
+                "API base URL", value=current_cfg.get("llm_api_base") or ""
+            )
+        else:
+            api_base = None
+        if st.button("Apply", use_container_width=True, type="primary"):
+            with st.spinner("Switching model…"):
+                try:
+                    r = requests.post(
+                        f"{API_URL}/config",
+                        json={
+                            "llm_provider": provider,
+                            "llm_model": model,
+                            "llm_api_base": api_base or None,
+                        },
+                        timeout=30,
+                    )
+                    r.raise_for_status()
+                    fetch_llm_config.clear()
+                    st.success(f"{provider} / {model}")
+                except Exception as e:
+                    st.error(str(e))
 
 
 # ── Chat ──────────────────────────────────────────────────────────────────────
