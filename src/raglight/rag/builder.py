@@ -71,6 +71,7 @@ class Builder:
             self.embeddings = GeminiEmbeddingsModel(**kwargs)
         elif type == Settings.AWS_BEDROCK:
             from ..embeddings.bedrock_embeddings import BedrockEmbeddingsModel
+
             kwargs.pop("api_base", None)
             self.embeddings = BedrockEmbeddingsModel(**kwargs)
         else:
@@ -160,6 +161,7 @@ class Builder:
             self.llm = GeminiModel(**kwargs)
         elif type == Settings.AWS_BEDROCK:
             from ..llm.bedrock_model import BedrockModel
+
             kwargs.pop("api_base", None)
             self.llm = BedrockModel(**kwargs)
         else:

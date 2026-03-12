@@ -77,10 +77,14 @@ class GeminiModel(LLM):
 
         for msg in history:
             role = "model" if msg["role"] == "assistant" else "user"
-            contents.append(types.Content(role=role, parts=[types.Part(text=msg["content"])]))
+            contents.append(
+                types.Content(role=role, parts=[types.Part(text=msg["content"])])
+            )
 
         contents.append(
-            types.Content(role="user", parts=[types.Part(text=input.get("question", ""))])
+            types.Content(
+                role="user", parts=[types.Part(text=input.get("question", ""))]
+            )
         )
 
         config = None

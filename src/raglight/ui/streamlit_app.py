@@ -62,7 +62,14 @@ def api_health() -> bool:
         return False
 
 
-LLM_PROVIDERS = ["Ollama", "OpenAI", "LmStudio", "Mistral", "GoogleGemini", "AWSBedrock"]
+LLM_PROVIDERS = [
+    "Ollama",
+    "OpenAI",
+    "LmStudio",
+    "Mistral",
+    "GoogleGemini",
+    "AWSBedrock",
+]
 # Providers that require an API base URL
 PROVIDERS_WITH_API_BASE = {"Ollama", "OpenAI", "LmStudio", "Mistral"}
 
@@ -146,9 +153,7 @@ with st.sidebar:
                         f"{API_URL}/ingest/upload", files=files, timeout=300
                     )
                     r.raise_for_status()
-                    st.session_state.ingested_files.extend(
-                        [f.name for f in uploaded]
-                    )
+                    st.session_state.ingested_files.extend([f.name for f in uploaded])
                     st.session_state.upload_key += 1
                     fetch_collections.clear()
                     st.rerun()
@@ -174,9 +179,7 @@ with st.sidebar:
                         f"{API_URL}/ingest", json={"data_path": dir_path}, timeout=300
                     )
                     r.raise_for_status()
-                    st.session_state.ingested_files.append(
-                        f"📁 {Path(dir_path).name}"
-                    )
+                    st.session_state.ingested_files.append(f"📁 {Path(dir_path).name}")
                     fetch_collections.clear()
                     st.rerun()
                 except Exception as e:
@@ -195,9 +198,11 @@ with st.sidebar:
         provider = st.selectbox(
             "Provider",
             LLM_PROVIDERS,
-            index=LLM_PROVIDERS.index(current_cfg.get("llm_provider", "Ollama"))
-            if current_cfg.get("llm_provider") in LLM_PROVIDERS
-            else 0,
+            index=(
+                LLM_PROVIDERS.index(current_cfg.get("llm_provider", "Ollama"))
+                if current_cfg.get("llm_provider") in LLM_PROVIDERS
+                else 0
+            ),
         )
         model = st.text_input("Model", value=current_cfg.get("llm_model", ""))
         if provider in PROVIDERS_WITH_API_BASE:

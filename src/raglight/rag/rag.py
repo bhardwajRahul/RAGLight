@@ -110,8 +110,7 @@ class RAG:
             return {"question": state["question"]}
 
         history_text = "\n".join(
-            f"{msg['role'].capitalize()}: {msg['content']}"
-            for msg in state["history"]
+            f"{msg['role'].capitalize()}: {msg['content']}" for msg in state["history"]
         )
         prompt = (
             f"Given the following conversation history and a follow-up question, "
@@ -245,9 +244,7 @@ class RAG:
         os.environ["LANGFUSE_SECRET_KEY"] = self.langfuse_config.secret_key
         os.environ["LANGFUSE_HOST"] = self.langfuse_config.host
 
-        return CallbackHandler(
-            trace_context={"trace_id": self.langfuse_session_id}
-        )
+        return CallbackHandler(trace_context={"trace_id": self.langfuse_session_id})
 
     def generate(self, question: str) -> str:
         """
@@ -266,9 +263,7 @@ class RAG:
 
         if self.langfuse_config:
             callback = self._build_langfuse_callback()
-            response = self.graph.invoke(
-                self.state, config={"callbacks": [callback]}
-            )
+            response = self.graph.invoke(self.state, config={"callbacks": [callback]})
         else:
             response = self.graph.invoke(self.state)
 
