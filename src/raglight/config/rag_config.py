@@ -21,3 +21,4 @@ class RAGConfig:
         default_factory=lambda: list(Settings.DEFAULT_IGNORE_FOLDERS)
     )
     langfuse_config: Optional[LangfuseConfig] = field(default=None)
+    reformulation: bool = field(default=True)

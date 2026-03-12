@@ -59,6 +59,7 @@ class RAG:
         cross_encoder_model: CrossEncoderModel = None,
         stream: bool = False,
         langfuse_config: Optional[LangfuseConfig] = None,
+        reformulation: bool = True,
     ) -> None:
         """
         Initializes the RAG pipeline.
@@ -67,6 +68,7 @@ class RAG:
             embedding_model (EmbeddingsModel): The embedding model used for vectorization.
             vector_store (VectorStore): The vector store for retrieving relevant documents.
             llm (LLM): The language model for generating answers.
+            reformulation (bool): Whether to rewrite the question before retrieval. Defaults to True.
         """
         self.embeddings: EmbeddingsModel = embedding_model.get_model()
         self.cross_encoder: CrossEncoderModel = (
@@ -76,6 +78,7 @@ class RAG:
         self.llm: LLM = llm
         self.k: int = k
         self.stream: bool = stream
+        self.reformulation: bool = reformulation
         self.langfuse_config: Optional[LangfuseConfig] = langfuse_config
         self.langfuse_session_id: str = (
             langfuse_config.session_id
@@ -86,6 +89,36 @@ class RAG:
         self.graph: Any = (
             self._createGraph()
         )  # Here type is CompiledGraph but it's not exposed by https://github.com/langchain-ai/langgraph/blob/main/libs/langgraph/langgraph/graph/graph.py
+
+    def _reformulate(self, state: State) -> Dict[str, str]:
+        """
+        Rewrites the question as a standalone question using the conversation history.
+
+        If there is no history, the original question is returned unchanged.
+
+        Args:
+            state (State): Current pipeline state with 'question' and 'history'.
+
+        Returns:
+            Dict[str, str]: Updated state with the reformulated question.
+        """
+        if not state["history"]:
+            return {"question": state["question"]}
+
+        history_text = "\n".join(
+            f"{msg['role'].capitalize()}: {msg['content']}"
+            for msg in state["history"]
+        )
+        prompt = (
+            f"Given the following conversation history and a follow-up question, "
+            f"rewrite the follow-up question as a standalone question that captures all necessary context.\n\n"
+            f"Conversation history:\n{history_text}\n\n"
+            f"Follow-up question: {state['question']}\n\n"
+            f"Standalone question (output ONLY the reformulated question, nothing else):"
+        )
+        reformulated = self.llm.generate({"question": prompt, "history": []})
+        logger.info(f"Reformulated question: {reformulated.strip()}")
+        return {"question": reformulated.strip()}
 
     def _retrieve(self, state: State) -> Dict[str, List[Document]]:
         """
@@ -170,15 +203,17 @@ class RAG:
             StateGraph: The compiled state graph for managing the RAG process flow.
         """
         if self.cross_encoder:
-            graph_builder = StateGraph(State).add_sequence(
-                [self._retrieve, self._rerank, self._generate_graph]
-            )
+            steps = [self._retrieve, self._rerank, self._generate_graph]
             self.k = 4 * self.k  # Increase retrieval window for reranking
         else:
-            graph_builder = StateGraph(State).add_sequence(
-                [self._retrieve, self._generate_graph]
-            )
-        graph_builder.add_edge(START, "_retrieve")
+            steps = [self._retrieve, self._generate_graph]
+
+        if self.reformulation:
+            steps = [self._reformulate] + steps
+
+        graph_builder = StateGraph(State).add_sequence(steps)
+        first_step = "_reformulate" if self.reformulation else "_retrieve"
+        graph_builder.add_edge(START, first_step)
         return graph_builder.compile()
 
     def _build_langfuse_callback(self) -> Any:

@@ -67,7 +67,7 @@ class RAGPipeline:
                 system_prompt=system_prompt,
                 api_base=api_base,
             )
-            .build_rag(k=k, langfuse_config=config.langfuse_config)
+            .build_rag(k=k, langfuse_config=config.langfuse_config, reformulation=config.reformulation)
         )
         self.github_scrapper: GithubScrapper = GithubScrapper()
 

@@ -52,6 +52,8 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
   - [Use Custom Pipeline](#use-custom-pipeline)
   - [Override Default Processors](#override-default-processors)
   - [Hybrid Search](#hybrid-search-bm25--semantic--rrf-)
+  - [Query Reformulation](#query-reformulation-✍️)
+  - [AWS Bedrock](#aws-bedrock-☁️)
   - [Observability with Langfuse](#observability-with-langfuse)
 
 - [Use RAGLight with Docker](#use-raglight-with-docker)
@@ -66,24 +68,28 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 > Actually RAGLight supports :
 >
 > - Ollama
-> - Google
+> - Google Gemini
 > - LMStudio
 > - vLLM
 > - OpenAI API
 > - Mistral API
+> - AWS Bedrock
 >
 > If you use LMStudio, you need to have the model you want to use loaded in LMStudio.
+> If you use AWS Bedrock, configure your AWS credentials (env vars, `~/.aws/credentials`, or IAM role) — no extra install needed.
 
 ## Features
 
 - **Embeddings Model Integration**: Plug in your preferred embedding models (e.g., HuggingFace **all-MiniLM-L6-v2**) for compact and efficient vector embeddings.
-- **LLM Agnostic**: Seamlessly integrates with different LLMs from different providers (Ollama and LMStudio supported).
+- **LLM Agnostic**: Seamlessly integrates with different LLMs from different providers (Ollama, LMStudio, Mistral, OpenAI, Google Gemini, AWS Bedrock).
 - **RAG Pipeline**: Combines document retrieval and language generation in a unified workflow.
 - **Agentic RAG Pipeline**: Use Agent to improve your RAG performances.
 - 🔌 **MCP Integration**: Add external tool capabilities (e.g. code execution, database access) via MCP servers.
 - **Flexible Document Support**: Ingest and index various document types (e.g., PDF, TXT, DOCX, Python, Javascript, ...).
 - **Extensible Architecture**: Easily swap vector stores, embedding models, or LLMs to suit your needs.
 - 🔍 **Hybrid Search (BM25 + Semantic + RRF)**: Combine keyword-based BM25 retrieval with dense vector search using Reciprocal Rank Fusion for best-of-both-worlds results.
+- ✍️ **Query Reformulation**: Automatically rewrites follow-up questions into standalone queries using conversation history, improving retrieval accuracy in multi-turn conversations.
+- ☁️ **AWS Bedrock**: Use Claude, Titan, Llama and other Bedrock models for both LLM inference and embeddings.
 - 📊 **Langfuse Observability (v3+)**: Trace every RAG call end-to-end — retrieve, rerank, and generate — directly in your Langfuse dashboard.
 
 ---
@@ -239,6 +245,7 @@ The UI lets you:
 - **Chat** with your documents — full conversation history, markdown rendering
 - **Upload files** directly from the browser (PDF, TXT, code…)
 - **Ingest a directory** by providing a path on the server machine
+- **Switch LLM on the fly** — the sidebar's ⚙️ Model settings panel lets you change provider, model, and API base URL without restarting the server (`AWSBedrock` and `GoogleGemini` included)
 
 Use `--ui-port` to change the Streamlit port:
 
@@ -255,8 +262,10 @@ Both processes share the same configuration (env vars) and are terminated togeth
 | `GET` | `/health` | — | `{"status": "ok"}` |
 | `POST` | `/generate` | `{"question": "..."}` | `{"answer": "..."}` |
 | `POST` | `/ingest` | `{"data_path": "...", "file_paths": [...], "github_url": "...", "github_branch": "main"}` | `{"message": "..."}` |
-| `POST` | `/ingest/upload` | `multipart/form-data` — champ `files` (un ou plusieurs fichiers) | `{"message": "..."}` |
+| `POST` | `/ingest/upload` | `multipart/form-data` — field `files` (one or more files) | `{"message": "..."}` |
 | `GET` | `/collections` | — | `{"collections": [...]}` |
+| `GET` | `/config` | — | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}` |
+| `POST` | `/config` | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}` | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}` |
 
 The interactive API documentation (Swagger UI) is automatically available at `http://localhost:8000/docs`.
 
@@ -308,6 +317,7 @@ All server settings are read from `RAGLIGHT_*` environment variables. Copy `exam
 | `RAGLIGHT_SYSTEM_PROMPT` | *(default prompt)* | Custom system prompt for the LLM |
 | `RAGLIGHT_CHROMA_HOST` | — | Remote Chroma host (leave unset for local storage) |
 | `RAGLIGHT_CHROMA_PORT` | — | Remote Chroma port |
+| `RAGLIGHT_API_TIMEOUT` | `300` | Request timeout in seconds for the Streamlit UI (increase for slow models) |
 
 ### Deploy with Docker Compose
 
@@ -335,6 +345,7 @@ You can set several environment variables to change **RAGLight** settings :
 - `OPENAI_CLIENT_URL` if you have a custom OpenAI URL or vLLM URL
 - `OPENAI_API_KEY` if you need an OpenAI key
 - `GEMINI_API_KEY` if you need a Google Gemini API key
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` for AWS Bedrock (alternatively use `~/.aws/credentials` or an IAM role)
 
 **REST API server (`raglight serve`)**
 
@@ -351,7 +362,8 @@ For your LLM inference, you can use these providers :
 - Mistral API (`Settings.MISTRAL`)
 - vLLM (`Settings.VLLM`)
 - OpenAI (`Settings.OPENAI`)
-- Google (`Settings.GOOGLE_GEMINI`)
+- Google Gemini (`Settings.GOOGLE_GEMINI`)
+- AWS Bedrock (`Settings.AWS_BEDROCK`)
 
 ### Embeddings
 
@@ -361,7 +373,8 @@ For embeddings models, you can use these providers :
 - Ollama (`Settings.OLLAMA`)
 - vLLM (`Settings.VLLM`)
 - OpenAI (`Settings.OPENAI`)
-- Google (`Settings.GOOGLE_GEMINI`)
+- Google Gemini (`Settings.GOOGLE_GEMINI`)
+- AWS Bedrock (`Settings.AWS_BEDROCK`)
 
 ### Vector Store
 
@@ -732,6 +745,109 @@ print(response)
 > **How RRF works**: each search mode returns its own ranked list of documents. RRF assigns a score of `1 / (k + rank)` to each document per list and sums them — documents appearing high in both lists are promoted, while documents unique to one list are kept but ranked lower. This gives the hybrid mode better recall and precision than either mode alone.
 
 > See the full working example in [examples/hybrid_search_example.py](examples/hybrid_search_example.py).
+
+---
+
+### Query Reformulation ✍️
+
+RAGLight automatically rewrites follow-up questions into standalone queries before retrieval. This dramatically improves accuracy in multi-turn conversations where the user's question references previous context (e.g. *"and for Python?"* → *"How do I do X in Python?"*).
+
+Reformulation is **enabled by default**. The current LLM is used to rewrite the question; if there is no conversation history yet, the question is passed through unchanged.
+
+#### With the high-level RAGPipeline API
+
+```python
+from raglight.config.rag_config import RAGConfig
+from raglight.config.settings import Settings
+
+# Enabled by default
+config = RAGConfig(
+    llm=Settings.DEFAULT_LLM,
+    provider=Settings.OLLAMA,
+)
+
+# Disable if needed
+config = RAGConfig(
+    llm=Settings.DEFAULT_LLM,
+    provider=Settings.OLLAMA,
+    reformulation=False,
+)
+```
+
+#### With the Builder API
+
+```python
+from raglight.rag.builder import Builder
+from raglight.config.settings import Settings
+
+rag = (
+    Builder()
+    .with_embeddings(Settings.HUGGINGFACE, model_name="all-MiniLM-L6-v2")
+    .with_vector_store(Settings.CHROMA, persist_directory="./myDb", collection_name="my_collection")
+    .with_llm(Settings.OLLAMA, model_name="llama3.1:8b")
+    .build_rag(k=5, reformulation=True)  # True by default
+)
+```
+
+The reformulated question is logged at `INFO` level so you can inspect what the LLM produced.
+
+**Pipeline with reformulation enabled:**
+```
+reformulate → retrieve → [rerank?] → generate
+```
+
+---
+
+### AWS Bedrock ☁️
+
+RAGLight supports AWS Bedrock for both LLM inference and embeddings. Authentication relies on the standard boto3 credential chain (env vars, `~/.aws/credentials`, or IAM role).
+
+**AWS credentials (one of):**
+- Environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`
+- AWS credentials file: `~/.aws/credentials`
+- IAM role (EC2 / ECS / Lambda)
+
+**Supported models (examples):**
+
+| Type | Model ID |
+|---|---|
+| LLM | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
+| LLM | `anthropic.claude-3-haiku-20240307-v1:0` |
+| LLM | `amazon.titan-text-express-v1` |
+| LLM | `meta.llama3-8b-instruct-v1:0` |
+| Embeddings | `amazon.titan-embed-text-v2:0` |
+| Embeddings | `cohere.embed-english-v3` |
+
+```python
+from raglight.rag.simple_rag_api import RAGPipeline
+from raglight.config.settings import Settings
+from raglight.config.rag_config import RAGConfig
+from raglight.config.vector_store_config import VectorStoreConfig
+from raglight.models.data_source_model import GitHubSource
+
+Settings.setup_logging()
+
+vector_store_config = VectorStoreConfig(
+    provider=Settings.AWS_BEDROCK,
+    embedding_model=Settings.AWS_BEDROCK_EMBEDDING_MODEL,  # amazon.titan-embed-text-v2:0
+    database=Settings.CHROMA,
+    persist_directory="./bedrockDb",
+    collection_name="bedrock_collection",
+)
+
+config = RAGConfig(
+    provider=Settings.AWS_BEDROCK,
+    llm=Settings.AWS_BEDROCK_LLM_MODEL,  # anthropic.claude-3-5-sonnet-20241022-v2:0
+    knowledge_base=[GitHubSource(url="https://github.com/Bessouat40/RAGLight")],
+)
+
+pipeline = RAGPipeline(config, vector_store_config)
+pipeline.build()
+response = pipeline.generate("How can I create a RAGPipeline using raglight?")
+print(response)
+```
+
+> See the full working example in [examples/bedrock_example.py](examples/bedrock_example.py).
 
 ---
 
