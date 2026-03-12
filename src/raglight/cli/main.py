@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 from typing import List, Optional, Tuple
+from dotenv import load_dotenv
 
 from raglight.rag.builder import Builder
 from raglight.config.settings import Settings
@@ -633,6 +634,7 @@ def serve_command(
     from raglight.api.server_config import ServerConfig
 
     config = ServerConfig()
+    load_dotenv()
     display_host = "localhost" if host == "0.0.0.0" else host
 
     console.print("[bold magenta]🚀 RAGLight API Server[/bold magenta]")
