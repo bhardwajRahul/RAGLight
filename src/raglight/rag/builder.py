@@ -168,7 +168,10 @@ class Builder:
         return self
 
     def build_rag(
-        self, k: int = 10, langfuse_config: Optional[LangfuseConfig] = None
+        self,
+        k: int = 10,
+        langfuse_config: Optional[LangfuseConfig] = None,
+        reformulation: bool = True,
     ) -> RAG:
         """
         Builds the RAG pipeline with the configured components.
@@ -199,6 +202,7 @@ class Builder:
             k,
             self.cross_encoder,
             langfuse_config=langfuse_config,
+            reformulation=reformulation,
         )
         logging.info("✅ RAG pipeline created")
         return self.rag
