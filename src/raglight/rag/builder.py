@@ -69,6 +69,9 @@ class Builder:
             self.embeddings = OpenAIEmbeddingsModel(**kwargs)
         elif type == Settings.GOOGLE_GEMINI:
             self.embeddings = GeminiEmbeddingsModel(**kwargs)
+        elif type == Settings.AWS_BEDROCK:
+            from ..embeddings.bedrock_embeddings import BedrockEmbeddingsModel
+            self.embeddings = BedrockEmbeddingsModel(**kwargs)
         else:
             raise ValueError(f"Unknown Embeddings Model type: {type}")
         logging.info("✅ Embeddings Model created")
@@ -154,6 +157,9 @@ class Builder:
             self.llm = OpenAIModel(**kwargs)
         elif type == Settings.GOOGLE_GEMINI:
             self.llm = GeminiModel(**kwargs)
+        elif type == Settings.AWS_BEDROCK:
+            from ..llm.bedrock_model import BedrockModel
+            self.llm = BedrockModel(**kwargs)
         else:
             raise ValueError(f"Unknown LLM type: {type}")
         logging.info("✅ LLM created")

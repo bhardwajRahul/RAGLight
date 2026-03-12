@@ -23,6 +23,10 @@ class Settings:
     VLLM = "vLLM"
     OPENAI = "OpenAI"
     GOOGLE_GEMINI = "GoogleGemini"
+    AWS_BEDROCK = "AWSBedrock"
+    AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    AWS_BEDROCK_LLM_MODEL = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    AWS_BEDROCK_EMBEDDING_MODEL = "amazon.titan-embed-text-v2:0"
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
     GEMINI_EMBEDDING_MODEL = "models/gemini-embedding-001"
     GEMINI_LLM_MODEL = "gemini-2.5-pro"
