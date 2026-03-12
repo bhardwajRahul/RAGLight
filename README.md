@@ -53,6 +53,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
   - [Override Default Processors](#override-default-processors)
   - [Hybrid Search](#hybrid-search-bm25--semantic--rrf-)
   - [Query Reformulation](#query-reformulation-✍️)
+  - [Conversation History](#conversation-history-💬)
   - [AWS Bedrock](#aws-bedrock-☁️)
   - [Observability with Langfuse](#observability-with-langfuse)
 
@@ -89,6 +90,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 - **Extensible Architecture**: Easily swap vector stores, embedding models, or LLMs to suit your needs.
 - 🔍 **Hybrid Search (BM25 + Semantic + RRF)**: Combine keyword-based BM25 retrieval with dense vector search using Reciprocal Rank Fusion for best-of-both-worlds results.
 - ✍️ **Query Reformulation**: Automatically rewrites follow-up questions into standalone queries using conversation history, improving retrieval accuracy in multi-turn conversations.
+- 💬 **Conversation History**: Full multi-turn history supported across all providers (Ollama, OpenAI, Mistral, LMStudio, Gemini, Bedrock) with optional `max_history` cap.
 - ☁️ **AWS Bedrock**: Use Claude, Titan, Llama and other Bedrock models for both LLM inference and embeddings.
 - 📊 **Langfuse Observability (v3+)**: Trace every RAG call end-to-end — retrieve, rerank, and generate — directly in your Langfuse dashboard.
 
@@ -795,6 +797,34 @@ The reformulated question is logged at `INFO` level so you can inspect what the 
 ```
 reformulate → retrieve → [rerank?] → generate
 ```
+
+---
+
+### Conversation History 💬
+
+RAGLight automatically maintains conversation history across `generate()` calls. Each turn appends a `user` and an `assistant` message passed to the LLM on the next call — enabling genuine multi-turn conversations across **all providers**.
+
+By default, history is capped at **20 messages** (~10 turns). Use `max_history` to adjust this limit, or pass `None` for unlimited history:
+
+```python
+# Via RAGConfig (high-level API)
+config = RAGConfig(
+    llm=Settings.DEFAULT_LLM,
+    provider=Settings.OLLAMA,
+    max_history=20,  # keep last 20 messages (~10 turns)
+)
+
+# Via Builder
+rag = (
+    Builder()
+    .with_embeddings(Settings.HUGGINGFACE, model_name="all-MiniLM-L6-v2")
+    .with_vector_store(Settings.CHROMA, persist_directory="./myDb", collection_name="col")
+    .with_llm(Settings.OLLAMA, model_name="llama3.1:8b")
+    .build_rag(k=5, max_history=20)
+)
+```
+
+> **Tip**: set `max_history` to roughly 2× the number of turns you want to retain (each turn = 2 messages).
 
 ---
 

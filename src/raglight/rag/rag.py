@@ -60,6 +60,7 @@ class RAG:
         stream: bool = False,
         langfuse_config: Optional[LangfuseConfig] = None,
         reformulation: bool = True,
+        max_history: Optional[int] = 20,
     ) -> None:
         """
         Initializes the RAG pipeline.
@@ -69,6 +70,8 @@ class RAG:
             vector_store (VectorStore): The vector store for retrieving relevant documents.
             llm (LLM): The language model for generating answers.
             reformulation (bool): Whether to rewrite the question before retrieval. Defaults to True.
+            max_history (Optional[int]): Maximum number of messages to keep in history.
+                                         None means unlimited. Defaults to 20.
         """
         self.embeddings: EmbeddingsModel = embedding_model.get_model()
         self.cross_encoder: CrossEncoderModel = (
@@ -79,6 +82,7 @@ class RAG:
         self.k: int = k
         self.stream: bool = stream
         self.reformulation: bool = reformulation
+        self.max_history: Optional[int] = max_history
         self.langfuse_config: Optional[LangfuseConfig] = langfuse_config
         self.langfuse_session_id: str = (
             langfuse_config.session_id
@@ -256,6 +260,9 @@ class RAG:
             str: The generated answer from the pipeline.
         """
         self.state["question"] = question
+
+        if self.max_history is not None:
+            self.state["history"] = self.state["history"][-self.max_history :]
 
         if self.langfuse_config:
             callback = self._build_langfuse_callback()

@@ -5,7 +5,7 @@ import logging
 
 try:
     from langchain_aws import ChatBedrock
-    from langchain_core.messages import HumanMessage, SystemMessage
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 except ImportError as e:
     raise ImportError(
         "AWS Bedrock support requires langchain-aws. "
@@ -76,9 +76,18 @@ class BedrockModel(LLM):
         Returns:
             str: The generated response text.
         """
+        history = input.get("history", [])
         messages = []
+
         if self.system_prompt:
             messages.append(SystemMessage(content=self.system_prompt))
+
+        for msg in history:
+            if msg["role"] == "assistant":
+                messages.append(AIMessage(content=msg["content"]))
+            else:
+                messages.append(HumanMessage(content=msg["content"]))
+
         messages.append(HumanMessage(content=input.get("question", "")))
         response = self.model.invoke(messages)
         return response.content
