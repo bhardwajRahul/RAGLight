@@ -22,3 +22,4 @@ from .rag.builder import Builder
 from .config.settings import Settings
 from .config.rag_config import RAGConfig
 from .config.agentic_rag_config import AgenticRAGConfig
+from .config.langfuse_config import LangfuseConfig

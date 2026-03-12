@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from ..config.settings import Settings
+from ..config.langfuse_config import LangfuseConfig
 from ..cross_encoder.cross_encoder_model import CrossEncoderModel
 from ..models.data_source_model import DataSource
 
@@ -19,3 +20,4 @@ class RAGConfig:
     ignore_folders: list = field(
         default_factory=lambda: list(Settings.DEFAULT_IGNORE_FOLDERS)
     )
+    langfuse_config: Optional[LangfuseConfig] = field(default=None)
