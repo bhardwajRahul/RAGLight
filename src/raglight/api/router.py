@@ -9,6 +9,7 @@ from starlette.concurrency import run_in_threadpool
 
 from ..document_processing.document_processor_factory import DocumentProcessorFactory
 from ..models.data_source_model import GitHubSource
+from ..rag.builder import Builder
 from ..scrapper.github_scrapper import GithubScrapper
 
 
@@ -33,6 +34,18 @@ class IngestResponse(BaseModel):
 
 class CollectionsResponse(BaseModel):
     collections: list
+
+
+class LLMConfigRequest(BaseModel):
+    llm_provider: str
+    llm_model: str
+    llm_api_base: Optional[str] = None
+
+
+class LLMConfigResponse(BaseModel):
+    llm_provider: str
+    llm_model: str
+    llm_api_base: Optional[str] = None
 
 
 def create_router() -> APIRouter:
@@ -164,5 +177,40 @@ def create_router() -> APIRouter:
         vector_store = pipeline.get_vector_store()
         cols = await run_in_threadpool(vector_store.get_available_collections)
         return CollectionsResponse(collections=cols)
+
+    @router.get("/config", response_model=LLMConfigResponse)
+    async def get_config(request: Request):
+        cfg = request.app.state.server_config
+        return LLMConfigResponse(
+            llm_provider=cfg.llm_provider,
+            llm_model=cfg.llm_model,
+            llm_api_base=cfg.llm_api_base,
+        )
+
+    @router.post("/config", response_model=LLMConfigResponse)
+    async def update_config(request: Request, body: LLMConfigRequest):
+        try:
+            new_llm = await run_in_threadpool(
+                lambda: Builder()
+                .with_llm(
+                    body.llm_provider,
+                    model_name=body.llm_model,
+                    api_base=body.llm_api_base,
+                )
+                .build_llm()
+            )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        request.app.state.pipeline.rag.llm = new_llm
+        cfg = request.app.state.server_config
+        cfg.llm_provider = body.llm_provider
+        cfg.llm_model = body.llm_model
+        cfg.llm_api_base = body.llm_api_base
+        return LLMConfigResponse(
+            llm_provider=cfg.llm_provider,
+            llm_model=cfg.llm_model,
+            llm_api_base=cfg.llm_api_base,
+        )
 
     return router

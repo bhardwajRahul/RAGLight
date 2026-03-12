@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
+from ..config.langfuse_config import LangfuseConfig
 from ..config.settings import Settings
 from ..config.rag_config import RAGConfig
 from ..config.vector_store_config import VectorStoreConfig
@@ -63,6 +64,26 @@ class ServerConfig:
             else None
         )
     )
+    langfuse_host: Optional[str] = field(
+        default_factory=lambda: os.environ.get("LANGFUSE_HOST")
+        or os.environ.get("LANGFUSE_BASE_URL")
+        or None
+    )
+    langfuse_public_key: Optional[str] = field(
+        default_factory=lambda: os.environ.get("LANGFUSE_PUBLIC_KEY") or None
+    )
+    langfuse_secret_key: Optional[str] = field(
+        default_factory=lambda: os.environ.get("LANGFUSE_SECRET_KEY") or None
+    )
+
+    def _build_langfuse_config(self) -> Optional[LangfuseConfig]:
+        if self.langfuse_host and self.langfuse_public_key and self.langfuse_secret_key:
+            return LangfuseConfig(
+                public_key=self.langfuse_public_key,
+                secret_key=self.langfuse_secret_key,
+                host=self.langfuse_host,
+            )
+        return None
 
     def to_rag_config(self) -> RAGConfig:
         return RAGConfig(
@@ -71,6 +92,7 @@ class ServerConfig:
             api_base=self.llm_api_base,
             system_prompt=self.system_prompt,
             k=self.k,
+            langfuse_config=self._build_langfuse_config(),
         )
 
     def to_vector_store_config(self) -> VectorStoreConfig:

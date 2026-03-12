@@ -52,6 +52,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
   - [Use Custom Pipeline](#use-custom-pipeline)
   - [Override Default Processors](#override-default-processors)
   - [Hybrid Search](#hybrid-search-bm25--semantic--rrf-)
+  - [Observability with Langfuse](#observability-with-langfuse)
 
 - [Use RAGLight with Docker](#use-raglight-with-docker)
 
@@ -83,6 +84,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 - **Flexible Document Support**: Ingest and index various document types (e.g., PDF, TXT, DOCX, Python, Javascript, ...).
 - **Extensible Architecture**: Easily swap vector stores, embedding models, or LLMs to suit your needs.
 - 🔍 **Hybrid Search (BM25 + Semantic + RRF)**: Combine keyword-based BM25 retrieval with dense vector search using Reciprocal Rank Fusion for best-of-both-worlds results.
+- 📊 **Langfuse Observability (v3+)**: Trace every RAG call end-to-end — retrieve, rerank, and generate — directly in your Langfuse dashboard.
 
 ---
 
@@ -206,6 +208,19 @@ RAGLIGHT_LLM_MODEL=mistral-small-latest \
 RAGLIGHT_LLM_PROVIDER=Mistral \
 raglight serve --port 8080
 ```
+
+Langfuse tracing example:
+
+```bash
+LANGFUSE_HOST=http://localhost:3000 \
+LANGFUSE_PUBLIC_KEY=pk-lf-... \
+LANGFUSE_SECRET_KEY=sk-lf-... \
+raglight serve
+```
+
+> Langfuse tracing is enabled automatically when `LANGFUSE_HOST` (or `LANGFUSE_BASE_URL`),
+> `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are all set in the environment.
+> Requires `pip install "raglight[langfuse]"`.
 
 ### Launch the Chat UI 💬
 
@@ -717,6 +732,87 @@ print(response)
 > **How RRF works**: each search mode returns its own ranked list of documents. RRF assigns a score of `1 / (k + rank)` to each document per list and sums them — documents appearing high in both lists are promoted, while documents unique to one list are kept but ranked lower. This gives the hybrid mode better recall and precision than either mode alone.
 
 > See the full working example in [examples/hybrid_search_example.py](examples/hybrid_search_example.py).
+
+---
+
+### Observability with Langfuse
+
+RAGLight supports **Langfuse 4.0.0** for full observability of your RAG pipeline. Every `generate()` call is traced as a single Langfuse trace, with each LangGraph node (retrieve, rerank, generate) appearing as a separate span.
+
+#### Install the extra dependency
+
+```bash
+pip install "raglight[langfuse]"
+# or directly:
+pip install "langfuse==4.0.0"
+```
+
+#### Usage with RAGPipeline
+
+```python
+from raglight.config.rag_config import RAGConfig
+from raglight.config.vector_store_config import VectorStoreConfig
+from raglight.config.langfuse_config import LangfuseConfig
+from raglight.config.settings import Settings
+from raglight.rag.simple_rag_api import RAGPipeline
+
+langfuse_config = LangfuseConfig(
+    public_key="pk-lf-...",
+    secret_key="sk-lf-...",
+    host="http://localhost:3000",  # or your Langfuse Cloud URL
+)
+
+config = RAGConfig(
+    llm=Settings.DEFAULT_LLM,
+    provider=Settings.OLLAMA,
+    langfuse_config=langfuse_config,
+)
+
+vector_store_config = VectorStoreConfig(
+    embedding_model=Settings.DEFAULT_EMBEDDINGS_MODEL,
+    provider=Settings.HUGGINGFACE,
+    database=Settings.CHROMA,
+    persist_directory="./myDb",
+    collection_name="my_collection",
+)
+
+pipeline = RAGPipeline(config, vector_store_config)
+pipeline.build()
+response = pipeline.generate("What is RAGLight?")
+print(response)
+```
+
+#### Usage with the Builder API
+
+```python
+from raglight.rag.builder import Builder
+from raglight.config.langfuse_config import LangfuseConfig
+from raglight.config.settings import Settings
+
+langfuse_config = LangfuseConfig(
+    public_key="pk-lf-...",
+    secret_key="sk-lf-...",
+    host="http://localhost:3000",
+)
+
+rag = (
+    Builder()
+    .with_embeddings(Settings.HUGGINGFACE, model_name=Settings.DEFAULT_EMBEDDINGS_MODEL)
+    .with_vector_store(Settings.CHROMA, persist_directory="./myDb", collection_name="my_collection")
+    .with_llm(Settings.OLLAMA, model_name=Settings.DEFAULT_LLM)
+    .build_rag(k=5, langfuse_config=langfuse_config)
+)
+
+rag.vector_store.ingest(data_path="./docs")
+response = rag.generate("Explain the retrieval pipeline")
+print(response)
+```
+
+#### Session ID
+
+By default, a **UUID is generated once per `RAG` instance** and reused for every `generate()` call, so all turns of the same conversation are grouped under the same Langfuse trace.
+
+You can pin a custom ID via `LangfuseConfig(session_id="my-session-42", ...)`.
 
 ---
 

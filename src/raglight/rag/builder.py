@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from ..config.langfuse_config import LangfuseConfig
 from ..embeddings.ollama_embeddings import OllamaEmbeddingsModel
 from ..cross_encoder.cross_encoder_model import CrossEncoderModel
 from ..cross_encoder.huggingface_cross_encoder import HuggingfaceCrossEncoderModel
@@ -68,6 +69,10 @@ class Builder:
             self.embeddings = OpenAIEmbeddingsModel(**kwargs)
         elif type == Settings.GOOGLE_GEMINI:
             self.embeddings = GeminiEmbeddingsModel(**kwargs)
+        elif type == Settings.AWS_BEDROCK:
+            from ..embeddings.bedrock_embeddings import BedrockEmbeddingsModel
+            kwargs.pop("api_base", None)
+            self.embeddings = BedrockEmbeddingsModel(**kwargs)
         else:
             raise ValueError(f"Unknown Embeddings Model type: {type}")
         logging.info("✅ Embeddings Model created")
@@ -153,17 +158,26 @@ class Builder:
             self.llm = OpenAIModel(**kwargs)
         elif type == Settings.GOOGLE_GEMINI:
             self.llm = GeminiModel(**kwargs)
+        elif type == Settings.AWS_BEDROCK:
+            from ..llm.bedrock_model import BedrockModel
+            kwargs.pop("api_base", None)
+            self.llm = BedrockModel(**kwargs)
         else:
             raise ValueError(f"Unknown LLM type: {type}")
         logging.info("✅ LLM created")
         return self
 
-    def build_rag(self, k: int = 10) -> RAG:
+    def build_rag(
+        self, k: int = 10, langfuse_config: Optional[LangfuseConfig] = None
+    ) -> RAG:
         """
         Builds the RAG pipeline with the configured components.
 
         Args:
-            k (int, optional): The number of top documents to retrieve. Defaults to 5.
+            k (int, optional): The number of top documents to retrieve. Defaults to 10.
+            langfuse_config (Optional[LangfuseConfig]): Langfuse observability
+                configuration (v3+). When provided, every ``RAG.generate()`` call
+                is traced in Langfuse. Defaults to ``None``.
 
         Returns:
             RAG: The fully configured RAG pipeline instance.
@@ -179,7 +193,12 @@ class Builder:
             raise ValueError("Embeddings Model is required")
         logging.info("⏳ Building the RAG pipeline...")
         self.rag = RAG(
-            self.embeddings, self.vector_store, self.llm, k, self.cross_encoder
+            self.embeddings,
+            self.vector_store,
+            self.llm,
+            k,
+            self.cross_encoder,
+            langfuse_config=langfuse_config,
         )
         logging.info("✅ RAG pipeline created")
         return self.rag

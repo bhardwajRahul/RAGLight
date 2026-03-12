@@ -11,3 +11,5 @@ class TestsConfig:
     DATA_PATH = "tests/tests_vector_store/fixtures"
 
     OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
+    BEDROCK_LLM_MODEL = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    BEDROCK_EMBEDDING_MODEL = "amazon.titan-embed-text-v2:0"

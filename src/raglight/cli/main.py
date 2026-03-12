@@ -623,6 +623,8 @@ def serve_command(
     """
     Start the RAGLight REST API server (configured via RAGLIGHT_* env vars).
     Use --ui to also launch the Streamlit chat interface.
+    Langfuse tracing is enabled automatically when LANGFUSE_HOST (or LANGFUSE_BASE_URL),
+    LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set in the environment.
     """
     import signal
     import subprocess
@@ -647,6 +649,14 @@ def serve_command(
         console.print(
             f"  Chroma       : [cyan]{config.chroma_host}:{config.chroma_port}[/cyan]"
         )
+    if config.langfuse_host:
+        if config.langfuse_public_key and config.langfuse_secret_key:
+            console.print(f"  Langfuse     : [cyan]{config.langfuse_host}[/cyan]")
+        else:
+            console.print(
+                "  Langfuse     : [bold yellow]host set but LANGFUSE_PUBLIC_KEY / "
+                "LANGFUSE_SECRET_KEY are missing — tracing disabled[/bold yellow]"
+            )
 
     if not ui:
         console.print(f"\n[bold green]Listening on http://{host}:{port}[/bold green]\n")

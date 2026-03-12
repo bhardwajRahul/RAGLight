@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import logging
+import os
+import uuid
+from typing import Any, Optional
+
+from langchain_core.documents import Document
+from langgraph.graph import START, StateGraph
+from typing_extensions import Dict, List, TypedDict
+
+from ..config.langfuse_config import LangfuseConfig
 from ..cross_encoder.cross_encoder_model import CrossEncoderModel
-from ..vectorstore.vector_store import VectorStore
 from ..embeddings.embeddings_model import EmbeddingsModel
 from ..llm.llm import LLM
-from langgraph.graph import START, StateGraph
-from typing_extensions import List, TypedDict, Dict
-from langchain_core.documents import Document
-from typing import Any
-import logging
+from ..vectorstore.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +58,7 @@ class RAG:
         k: int,
         cross_encoder_model: CrossEncoderModel = None,
         stream: bool = False,
+        langfuse_config: Optional[LangfuseConfig] = None,
     ) -> None:
         """
         Initializes the RAG pipeline.
@@ -70,6 +76,12 @@ class RAG:
         self.llm: LLM = llm
         self.k: int = k
         self.stream: bool = stream
+        self.langfuse_config: Optional[LangfuseConfig] = langfuse_config
+        self.langfuse_session_id: str = (
+            langfuse_config.session_id
+            if langfuse_config and langfuse_config.session_id
+            else uuid.uuid4().hex  # 32 lowercase hex chars, required by Langfuse v4
+        )
         self.state: State = State(question="", answer="", context=[], history=[])
         self.graph: Any = (
             self._createGraph()
@@ -169,6 +181,35 @@ class RAG:
         graph_builder.add_edge(START, "_retrieve")
         return graph_builder.compile()
 
+    def _build_langfuse_callback(self) -> Any:
+        """
+        Builds a Langfuse ``CallbackHandler`` from the stored configuration.
+
+        Sets the required environment variables and returns a handler whose
+        ``trace_id`` is fixed to ``self.langfuse_session_id`` so that all turns
+        of the same conversation are grouped under the same Langfuse trace.
+
+        Returns:
+            CallbackHandler: A ready-to-use Langfuse LangChain callback.
+
+        Raises:
+            ImportError: If ``langfuse==4.0.0`` is not installed.
+        """
+        try:
+            from langfuse.langchain import CallbackHandler
+        except ImportError as exc:
+            raise ImportError(
+                "Langfuse is not installed. Install it with: pip install 'langfuse==4.0.0'"
+            ) from exc
+
+        os.environ["LANGFUSE_PUBLIC_KEY"] = self.langfuse_config.public_key
+        os.environ["LANGFUSE_SECRET_KEY"] = self.langfuse_config.secret_key
+        os.environ["LANGFUSE_HOST"] = self.langfuse_config.host
+
+        return CallbackHandler(
+            trace_context={"trace_id": self.langfuse_session_id}
+        )
+
     def generate(self, question: str) -> str:
         """
         Executes the RAG pipeline for a given question.
@@ -180,7 +221,15 @@ class RAG:
             str: The generated answer from the pipeline.
         """
         self.state["question"] = question
-        response = self.graph.invoke(self.state)
+
+        if self.langfuse_config:
+            callback = self._build_langfuse_callback()
+            response = self.graph.invoke(
+                self.state, config={"callbacks": [callback]}
+            )
+        else:
+            response = self.graph.invoke(self.state)
+
         answer = response["answer"]
         self.state["history"].extend(
             [
