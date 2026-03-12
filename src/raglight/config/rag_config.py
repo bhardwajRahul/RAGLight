@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from ..config.settings import Settings
 from ..config.langfuse_config import LangfuseConfig
@@ -22,3 +22,4 @@ class RAGConfig:
     )
     langfuse_config: Optional[LangfuseConfig] = field(default=None)
     reformulation: bool = field(default=True)
+    max_history: int = field(default=20)

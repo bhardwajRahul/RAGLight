@@ -29,19 +29,20 @@ class LMStudioModel(LLM):
 
     @override
     def generate(self, input: Dict[str, Any]) -> str:
-        new_input = dumps(input)
-        payload = {
-            "role": self.role,
-            "content": new_input,
-        }
+        history = input.get("history", [])
+        messages = [{"role": "system", "content": self.system_prompt}]
+
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+
+        payload = {"role": self.role, "content": input.get("question", "")}
         if "images" in input:
             payload["images"] = input["images"]
+        messages.append(payload)
+
         response = self.model.chat.completions.create(
             model=self.model_name,
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                payload,
-            ],
+            messages=messages,
             temperature=0.7,
         )
         return response.choices[0].message.content

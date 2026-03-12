@@ -172,6 +172,7 @@ class Builder:
         k: int = 10,
         langfuse_config: Optional[LangfuseConfig] = None,
         reformulation: bool = True,
+        max_history: Optional[int] = 20,
     ) -> RAG:
         """
         Builds the RAG pipeline with the configured components.
@@ -203,6 +204,7 @@ class Builder:
             self.cross_encoder,
             langfuse_config=langfuse_config,
             reformulation=reformulation,
+            max_history=max_history,
         )
         logging.info("✅ RAG pipeline created")
         return self.rag

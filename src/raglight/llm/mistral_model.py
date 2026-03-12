@@ -66,14 +66,16 @@ class MistralModel(LLM):
         Returns:
             str: The generated output from the model.
         """
-        content_blocks = []
+        history = input.get("history", [])
+        messages = []
 
         if self.system_prompt:
-            content_blocks.append(
-                {"type": "text", "text": f"[SYSTEM PROMPT]\n{self.system_prompt}"}
-            )
+            messages.append({"role": "system", "content": self.system_prompt})
 
-        content_blocks.append({"type": "text", "text": input.get("question", "")})
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+
+        content_blocks = [{"type": "text", "text": input.get("question", "")}]
 
         if "images" in input:
             for image in input["images"]:
@@ -86,8 +88,10 @@ class MistralModel(LLM):
                     )
                 except Exception as e:
                     logging.error(f"Could not read image: {e}")
+
+        messages.append({"role": self.role, "content": content_blocks})
         response = self.model.chat.complete(
             model=self.model_name,
-            messages=[{"role": self.role, "content": content_blocks}],
+            messages=messages,
         )
         return response.choices[0].message.content
