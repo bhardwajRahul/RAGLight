@@ -80,7 +80,7 @@ class RAG:
         self.langfuse_session_id: str = (
             langfuse_config.session_id
             if langfuse_config and langfuse_config.session_id
-            else str(uuid.uuid4())
+            else uuid.uuid4().hex  # 32 lowercase hex chars, required by Langfuse v4
         )
         self.state: State = State(question="", answer="", context=[], history=[])
         self.graph: Any = (

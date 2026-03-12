@@ -209,6 +209,19 @@ RAGLIGHT_LLM_PROVIDER=Mistral \
 raglight serve --port 8080
 ```
 
+Langfuse tracing example:
+
+```bash
+LANGFUSE_HOST=http://localhost:3000 \
+LANGFUSE_PUBLIC_KEY=pk-lf-... \
+LANGFUSE_SECRET_KEY=sk-lf-... \
+raglight serve
+```
+
+> Langfuse tracing is enabled automatically when `LANGFUSE_HOST` (or `LANGFUSE_BASE_URL`),
+> `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are all set in the environment.
+> Requires `pip install "raglight[langfuse]"`.
+
 ### Launch the Chat UI 💬
 
 Add `--ui` to start a **Streamlit chat interface** alongside the REST API — no extra setup required:

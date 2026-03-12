@@ -15,9 +15,11 @@ class LangfuseConfig:
         secret_key (str): Langfuse secret key (``LANGFUSE_SECRET_KEY``).
         host (str): Langfuse server URL. Defaults to ``http://localhost:3000``.
         session_id (Optional[str]): Fixed trace/session ID to attach to every call
-            made by this RAG instance. When ``None`` (default), a UUID is generated
+            made by this RAG instance. When ``None`` (default), a UUID hex is generated
             once at RAG construction time so all turns of the same conversation are
             grouped under the same trace.
+            Must be 32 lowercase hex characters without dashes (Langfuse v4 requirement),
+            e.g. ``uuid.uuid4().hex``.
     """
 
     public_key: str
