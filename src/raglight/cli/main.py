@@ -633,8 +633,8 @@ def serve_command(
     import uvicorn
     from raglight.api.server_config import ServerConfig
 
+    load_dotenv(dotenv_path=Path(".env"))
     config = ServerConfig()
-    load_dotenv()
     display_host = "localhost" if host == "0.0.0.0" else host
 
     console.print("[bold magenta]🚀 RAGLight API Server[/bold magenta]")

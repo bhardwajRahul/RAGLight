@@ -4,6 +4,11 @@ import os
 # Disable ChromaDB telemetry before chromadb is imported
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(".env"))
+
 from contextlib import asynccontextmanager
 from typing import Optional
 
