@@ -1,7 +1,7 @@
 import asyncio
-import concurrent.futures
 import logging
 import shutil
+import threading
 from typing import List
 
 from ..config.vector_store_config import VectorStoreConfig
@@ -20,21 +20,27 @@ class AgenticRAGPipeline:
     ) -> None:
         """
         Initializes the AgenticRAGPipeline.
+
+        A dedicated event loop running in a background daemon thread is created
+        at construction time. All async calls are submitted to this loop via
+        run_coroutine_threadsafe, which guarantees that LangGraph's internal
+        async state (tasks, futures) is always executed in the same loop and
+        never encounters a closed-loop error between calls.
         """
         self.config = config
         self.knowledge_base: List[DataSource] = config.knowledge_base
         self.ignore_folders = config.ignore_folders
 
         self.agenticRag = AgenticRAG(config, vector_store_config)
-
         self.github_scrapper: GithubScrapper = GithubScrapper()
+
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+        self._thread.start()
 
     def build(self) -> None:
         """
         Builds the RAG pipeline by ingesting data from the knowledge base.
-
-        This method processes the data sources (e.g., folders, GitHub repositories)
-        and creates the embeddings for the vector store.
         """
         repositories: List[GitHubSource] = []
         if not self.knowledge_base:
@@ -75,17 +81,12 @@ class AgenticRAGPipeline:
         """
         Synchronous wrapper for the agent's asynchronous generation.
 
-        Works in all contexts:
-        - Plain scripts: asyncio.run() directly.
-        - FastAPI/uvicorn (run_in_threadpool): no running loop in the thread, asyncio.run() used.
-        - Jupyter / nested loops: spawns a dedicated thread with its own event loop.
+        Submits the coroutine to the pipeline's persistent event loop running
+        in a background thread. Works correctly in all calling contexts:
+        plain scripts, FastAPI/uvicorn (run_in_threadpool), and Jupyter notebooks.
         """
-        coro = self.agenticRag.generate(question, stream=stream)
-        try:
-            asyncio.get_running_loop()
-            # A loop is already running (Jupyter, etc.) — delegate to a fresh thread.
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                return pool.submit(asyncio.run, coro).result()
-        except RuntimeError:
-            # No running loop — safe to call asyncio.run() directly.
-            return asyncio.run(coro)
+        future = asyncio.run_coroutine_threadsafe(
+            self.agenticRag.generate(question, stream=stream),
+            self._loop,
+        )
+        return future.result()
