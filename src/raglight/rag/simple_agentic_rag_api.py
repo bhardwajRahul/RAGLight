@@ -1,11 +1,8 @@
 import asyncio
+import concurrent.futures
 import logging
 import shutil
 from typing import List
-
-import nest_asyncio
-
-nest_asyncio.apply()
 
 from ..config.vector_store_config import VectorStoreConfig
 from .agentic_rag import AgenticRAG
@@ -78,10 +75,17 @@ class AgenticRAGPipeline:
         """
         Synchronous wrapper for the agent's asynchronous generation.
 
-        Works correctly in all contexts (scripts, Jupyter notebooks, FastAPI)
-        thanks to nest_asyncio applied at import time.
+        Works in all contexts:
+        - Plain scripts: asyncio.run() directly.
+        - FastAPI/uvicorn (run_in_threadpool): no running loop in the thread, asyncio.run() used.
+        - Jupyter / nested loops: spawns a dedicated thread with its own event loop.
         """
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(
-            self.agenticRag.generate(question, stream=stream)
-        )
+        coro = self.agenticRag.generate(question, stream=stream)
+        try:
+            asyncio.get_running_loop()
+            # A loop is already running (Jupyter, etc.) — delegate to a fresh thread.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(asyncio.run, coro).result()
+        except RuntimeError:
+            # No running loop — safe to call asyncio.run() directly.
+            return asyncio.run(coro)
