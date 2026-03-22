@@ -49,5 +49,53 @@ class TestOllamaModel(unittest.TestCase):
         )
 
 
+class TestOllamaModelStreaming(unittest.TestCase):
+    def setUp(self):
+        self.model = OllamaModel(
+            model_name=TestsConfig.OLLAMA_MODEL,
+            system_prompt="You are helpful.",
+            preload_model=False,
+        )
+        chunk1 = MagicMock()
+        chunk1.message.content = "Hello"
+        chunk2 = MagicMock()
+        chunk2.message.content = " world"
+        self.mock_client = MagicMock()
+        self.mock_client.chat.return_value = iter([chunk1, chunk2])
+        self.model.model = self.mock_client
+
+    def test_generate_streaming_yields_chunks(self):
+        result = list(self.model.generate_streaming({"question": "Say hello."}))
+        self.assertEqual(result, ["Hello", " world"])
+
+    def test_generate_streaming_builds_correct_messages(self):
+        list(self.model.generate_streaming({"question": "Say hello."}))
+        call_kwargs = self.mock_client.chat.call_args.kwargs
+        messages = call_kwargs["messages"]
+        # system prompt first
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertEqual(messages[0]["content"], "You are helpful.")
+        # user message with plain text content, NOT a JSON blob
+        self.assertEqual(messages[1]["role"], "user")
+        self.assertEqual(messages[1]["content"], "Say hello.")
+
+    def test_generate_streaming_includes_history(self):
+        history = [
+            {"role": "user", "content": "Previous question"},
+            {"role": "assistant", "content": "Previous answer"},
+        ]
+        list(self.model.generate_streaming({"question": "Follow-up.", "history": history}))
+        call_kwargs = self.mock_client.chat.call_args.kwargs
+        messages = call_kwargs["messages"]
+        # system + 2 history + user question = 4
+        self.assertEqual(len(messages), 4)
+        self.assertEqual(messages[1]["content"], "Previous question")
+
+    def test_generate_streaming_passes_stream_true(self):
+        list(self.model.generate_streaming({"question": "Say hello."}))
+        call_kwargs = self.mock_client.chat.call_args.kwargs
+        self.assertTrue(call_kwargs["stream"])
+
+
 if __name__ == "__main__":
     unittest.main()
