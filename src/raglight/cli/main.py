@@ -389,7 +389,7 @@ def interactive_chat_command():
 
 
 @app.command(name="agentic-chat")
-def interactive_chat_command():
+def interactive_agentic_chat_command():
     """
     Starts a guided, interactive session to configure, index, and chat with your data.
     """

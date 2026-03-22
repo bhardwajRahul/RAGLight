@@ -11,17 +11,11 @@ class GithubScrapper:
     A utility class for cloning and managing GitHub repositories.
 
     Attributes:
-        repo_urls (List[str]): A list of GitHub repository URLs to manage.
+        repositories (List[GitHubSource]): A list of GitHub repository sources to manage.
     """
 
     def __init__(self) -> None:
-        """
-        Initializes a GithubScrapper instance.
-
-        Args:
-            repositories (List[GitHubSource], optional): A list of GitHub repository sources to manage. Defaults to None.
-        """
-        pass
+        self.repositories: List[GitHubSource] = []
 
     @staticmethod
     def clone_github_repo(repo_url: str, clone_path: str, branch: str = "main") -> None:
@@ -35,18 +29,11 @@ class GithubScrapper:
 
         Raises:
             subprocess.CalledProcessError: If the git command fails.
-            Exception: If an unexpected error occurs during cloning.
         """
-        try:
-            command = ["git", "clone", "--branch", branch, repo_url, clone_path]
-            logging.info(f"Executing: {' '.join(command)}")
-
-            subprocess.run(command, check=True)
-            logging.info("✅ Clone successful!")
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Error while cloning repository: {e}")
-        except Exception as e:
-            logging.error(f"Unexpected error occurred: {e}")
+        command = ["git", "clone", "--branch", branch, repo_url, clone_path]
+        logging.info(f"Executing: {' '.join(command)}")
+        subprocess.run(command, check=True)
+        logging.info("✅ Clone successful!")
 
     def clone_all(self) -> str:
         """
@@ -67,7 +54,10 @@ class GithubScrapper:
             branch = repo.branch if hasattr(repo, "branch") else "main"
             repo_name = url.split("/")[-1].replace(".git", "")
             clone_path = temp_path / repo_name
-            self.clone_github_repo(url, str(clone_path), branch)
+            try:
+                self.clone_github_repo(url, str(clone_path), branch)
+            except Exception as e:
+                logging.error(f"Failed to clone {url}: {e}")
 
         return str(temp_path)
 

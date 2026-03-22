@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import Dict, List
 from langchain_core.documents import Document
 
 
@@ -12,10 +12,12 @@ class DocumentProcessor(ABC):
     @abstractmethod
     def process(
         self, file_path: str, chunk_size: int, chunk_overlap: int
-    ) -> List[Document]:
+    ) -> Dict[str, List[Document]]:
         """
         Loads a document from a file path, splits it into chunks,
-        and returns a list of Document objects ready for ingestion.
+        and returns a dict with two keys:
+        - "chunks": the full document split into chunks.
+        - "classes": class-level documents (for code files; empty list otherwise).
 
         Args:
             file_path (str): The path to the document file.
@@ -23,6 +25,6 @@ class DocumentProcessor(ABC):
             chunk_overlap (int): The amount of overlap between consecutive chunks.
 
         Returns:
-            List[Document]: A list of processed document chunks.
+            Dict[str, List[Document]]: {"chunks": [...], "classes": [...]}
         """
         pass

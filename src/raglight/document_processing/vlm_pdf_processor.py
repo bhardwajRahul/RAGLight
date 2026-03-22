@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+import shutil
 import tempfile
 import fitz
 from typing import List
@@ -56,10 +57,9 @@ class VlmPDFProcessor(DocumentProcessor):
                   - "classes": Empty list (for compatibility)
         """
 
+        tmp_dir = tempfile.mkdtemp(prefix="pdf_images_")
         try:
             doc = fitz.open(file_path)
-            tmp_dir = tempfile.mkdtemp(prefix="pdf_images_")
-
             documents: List[Document] = []
 
             for page_index, page in enumerate(doc):
@@ -141,3 +141,5 @@ class VlmPDFProcessor(DocumentProcessor):
         except Exception as e:
             logging.error(f"Failed to process PDF {file_path}. Error: {e}")
             return {"chunks": [], "classes": []}
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)

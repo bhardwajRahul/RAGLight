@@ -90,3 +90,14 @@ class AgenticRAGPipeline:
             self._loop,
         )
         return future.result()
+
+    def close(self) -> None:
+        """Stops the background event loop and joins its thread."""
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._thread.join()
+
+    def __enter__(self) -> "AgenticRAGPipeline":
+        return self
+
+    def __exit__(self, *args) -> None:
+        self.close()
