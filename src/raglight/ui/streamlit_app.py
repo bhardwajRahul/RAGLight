@@ -1,10 +1,10 @@
+import json
 import os
 from pathlib import Path
 import requests
 import streamlit as st
 
 API_URL = os.environ.get("RAGLIGHT_API_URL", "http://localhost:8000")
-# NOUVEAU: Timeout configurable (par défaut à 300 secondes, soit 5 minutes)
 API_TIMEOUT = int(os.environ.get("RAGLIGHT_API_TIMEOUT", 300))
 
 st.set_page_config(
@@ -94,26 +94,32 @@ def fetch_collections() -> list:
         return []
 
 
-# NOUVEAU: Fonction générateur pour le streaming de la réponse
 def stream_response(prompt: str):
-    """
-    Exemple de fonction pour gérer le streaming si le backend le supporte.
-    Attend une route d'API qui renvoie du Server-Sent Events (SSE) ou des chunks.
-    """
-    try:
-        # Note: Adapte le endpoint si nécessaire (ex: /generate_stream)
-        with requests.post(
-            f"{API_URL}/generate",
-            json={"question": prompt},
-            stream=True,
-            timeout=API_TIMEOUT,
-        ) as r:
-            r.raise_for_status()
-            for chunk in r.iter_content(chunk_size=1024, decode_unicode=True):
-                if chunk:
-                    yield chunk
-    except Exception as e:
-        yield f"⚠️ Erreur: {str(e)}"
+    """Consume the SSE /generate/stream endpoint and yield text chunks."""
+    with requests.post(
+        f"{API_URL}/generate/stream",
+        json={"question": prompt},
+        stream=True,
+        timeout=API_TIMEOUT,
+    ) as r:
+        r.raise_for_status()
+        for line in r.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            if line.startswith("data: "):
+                data = line[6:]
+                if data == "[DONE]":
+                    break
+                try:
+                    payload = json.loads(data)
+                    if "error" in payload:
+                        yield f"⚠️ {payload['error']}"
+                        break
+                    chunk = payload.get("chunk", "")
+                    if chunk:
+                        yield chunk
+                except Exception:
+                    pass
 
 
 # ── Session state ─────────────────────────────────────────────────────────────
@@ -123,6 +129,10 @@ if "ingested_files" not in st.session_state:
     st.session_state.ingested_files = []
 if "upload_key" not in st.session_state:
     st.session_state.upload_key = 0
+if "generating" not in st.session_state:
+    st.session_state.generating = False
+if "pending_prompt" not in st.session_state:
+    st.session_state.pending_prompt = None
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -231,7 +241,7 @@ with st.sidebar:
 
 
 # ── Chat ──────────────────────────────────────────────────────────────────────
-if not st.session_state.messages:
+if not st.session_state.messages and not st.session_state.generating:
     st.markdown(
         """
     <div style="text-align:center; padding-top:12vh; color:#6b7280">
@@ -251,32 +261,32 @@ else:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-if prompt := st.chat_input("Message RAGLight…", disabled=not healthy):
-    # 1. Ajouter le message utilisateur à l'historique et l'afficher
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# Input is disabled while a response is being generated
+prompt_input = st.chat_input(
+    "Message RAGLight…",
+    disabled=not healthy or st.session_state.generating,
+)
+
+if prompt_input:
+    st.session_state.pending_prompt = prompt_input
+    st.session_state.generating = True
+    st.rerun()
+
+if st.session_state.generating and st.session_state.pending_prompt:
+    prompt = st.session_state.pending_prompt
+
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 2. Générer et afficher la réponse de l'assistant
     with st.chat_message("assistant"):
-        # OPTION A: Rendu avec Streaming (recommandé si ton API le supporte)
-        # full_response = st.write_stream(stream_response(prompt))
+        try:
+            full_response = st.write_stream(stream_response(prompt))
+        except Exception as e:
+            full_response = f"⚠️ {e}"
+            st.markdown(full_response)
 
-        # OPTION B: Ton code d'origine (Bloquant) - Actif par défaut ici
-        with st.spinner("Thinking..."):
-            try:
-                # Utilisation de la nouvelle variable API_TIMEOUT
-                r = requests.post(
-                    f"{API_URL}/generate",
-                    json={"question": prompt},
-                    timeout=API_TIMEOUT,
-                )
-                r.raise_for_status()
-                full_response = r.json()["answer"]
-            except Exception as e:
-                full_response = f"⚠️ {e}"
-
-        st.markdown(full_response)
-
-    # 3. Sauvegarder la réponse dans l'historique
+    st.session_state.messages.append({"role": "user", "content": prompt})
     st.session_state.messages.append({"role": "assistant", "content": full_response})
+    st.session_state.generating = False
+    st.session_state.pending_prompt = None
+    st.rerun()

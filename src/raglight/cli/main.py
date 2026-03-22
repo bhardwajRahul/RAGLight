@@ -13,6 +13,7 @@ from raglight.rag.rag import RAG
 from typing_extensions import Annotated
 
 from rich.console import Console
+from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -154,6 +155,22 @@ app = typer.Typer(
 )
 
 
+def _safe_default(choices: list, value: str) -> str:
+    """Return value if it is in choices, otherwise the first choice."""
+    return value if value in choices else choices[0]
+
+
+RAGLIGHT_BANNER = """[bold yellow]
+██████╗  █████╗  ██████╗ ██╗     ██╗ ██████╗ ██╗  ██╗████████╗
+██╔══██╗██╔══██╗██╔════╝ ██║     ██║██╔════╝ ██║  ██║╚══██╔══╝
+██████╔╝███████║██║  ███╗██║     ██║██║  ███╗███████║   ██║
+██╔══██╗██╔══██║██║   ██║██║     ██║██║   ██║██╔══██║   ██║
+██║  ██║██║  ██║╚██████╔╝███████╗██║╚██████╔╝██║  ██║   ██║
+╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝
+[/bold yellow][dim]  ⚡ Retrieval-Augmented Generation — fast, modular, local[/dim]
+"""
+
+
 @app.callback()
 def callback():
     """
@@ -181,139 +198,116 @@ def callback():
 def interactive_chat_command():
     """
     Starts a guided, interactive session to configure, index, and chat with your data.
+    Tip: set RAGLIGHT_* env vars (or a .env file) to skip the wizard entirely.
     """
-    console.print(
-        "[bold magenta]👋 Welcome to the RAGLight Interactive Setup Wizard![/bold magenta]"
-    )
-    console.print(
-        "[magenta]I will guide you through setting up your RAG pipeline.[/magenta]"
-    )
+    console.print(RAGLIGHT_BANNER)
 
-    data_path, github_sources = prompt_data_sources()
+    from raglight.api.server_config import ServerConfig
 
-    # Configure ignore folders
-    console.print(
-        "[bold cyan]\n--- 🚫 Step 1.5: Ignore Folders Configuration ---[/bold cyan]"
-    )
-    console.print(
-        "[yellow]By default, the following folders will be ignored during indexing:[/yellow]"
-    )
-    default_ignore_folders = Settings.DEFAULT_IGNORE_FOLDERS
-    for folder in default_ignore_folders:
-        console.print(f"  • {folder}")
+    load_dotenv(dotenv_path=Path(".env"))
+    cfg = ServerConfig()
 
-    if typer.confirm(
-        "Do you want to customize the ignore folders list?", default=False
-    ):
-        ignore_folders = []
-        console.print(
-            "[cyan]Enter folder names to ignore (one per line, press Enter twice to finish):[/cyan]"
-        )
-        console.print(
-            "[yellow]Leave empty to use default list, or type 'default' to use default list[/yellow]"
-        )
+    _raglight_env_vars = [
+        "RAGLIGHT_LLM_MODEL", "RAGLIGHT_LLM_PROVIDER", "RAGLIGHT_EMBEDDINGS_MODEL",
+        "RAGLIGHT_EMBEDDINGS_PROVIDER", "RAGLIGHT_PERSIST_DIR", "RAGLIGHT_COLLECTION",
+    ]
+    headless = any(os.environ.get(v) for v in _raglight_env_vars)
 
-        while True:
-            folder = input("Folder to ignore (or Enter to finish): ").strip()
-            if not folder:
-                break
-            if folder.lower() == "default":
-                ignore_folders = default_ignore_folders.copy()
-                break
-            ignore_folders.append(folder)
+    emb_choices = [Settings.HUGGINGFACE, Settings.OLLAMA, Settings.OPENAI, Settings.GOOGLE_GEMINI]
+    llm_choices = [Settings.OLLAMA, Settings.MISTRAL, Settings.OPENAI, Settings.LMSTUDIO, Settings.GOOGLE_GEMINI]
+    k_choices = ["5", "10", "15"]
 
-        if not ignore_folders:
-            ignore_folders = default_ignore_folders.copy()
+    # ── Step 1: Model / DB config ──────────────────────────────────────────────
+    if headless:
+        db_path = cfg.persist_dir
+        collection = cfg.collection
+        emb_provider = cfg.embeddings_provider
+        embeddings_base_url = cfg.embeddings_api_base
+        emb_model = cfg.embeddings_model
+        llm_provider = cfg.llm_provider
+        llm_base_url = cfg.llm_api_base
+        llm_model = cfg.llm_model
+        k = cfg.k
+
+        console.print("[bold magenta]🚀 RAGLight Chat[/bold magenta]")
+        console.print(f"  LLM          : [cyan]{llm_provider}[/cyan] / [cyan]{llm_model}[/cyan]")
+        console.print(f"  Embeddings   : [cyan]{emb_provider}[/cyan] / [cyan]{emb_model}[/cyan]")
+        console.print(f"  Persist dir  : [cyan]{db_path}[/cyan]")
+        console.print(f"  Collection   : [cyan]{collection}[/cyan]")
+        console.print(f"  k            : [cyan]{k}[/cyan]")
     else:
-        ignore_folders = default_ignore_folders.copy()
+        console.print(
+            "[bold magenta]👋 Welcome to the RAGLight Interactive Setup Wizard![/bold magenta]"
+        )
+        console.print(
+            "[magenta]I will guide you through setting up your RAG pipeline.[/magenta]"
+        )
+        console.print(
+            "[dim]Tip: create a .env file with RAGLIGHT_* vars to skip the model setup.[/dim]\n"
+        )
 
-    console.print(
-        f"[green]✅ Will ignore {len(ignore_folders)} folders during indexing[/green]"
-    )
+        console.print("[bold cyan]\n--- 💾 Step 1: Vector Database ---[/bold cyan]")
+        db_path = typer.prompt(
+            "Where should the vector database be stored?",
+            default=cfg.persist_dir,
+        )
+        collection = typer.prompt(
+            "What is the name for the database collection?",
+            default=cfg.collection,
+        )
 
-    console.print("[bold cyan]\n--- 💾 Step 2: Vector Database ---[/bold cyan]")
-    db_path = typer.prompt(
-        "Where should the vector database be stored?",
-        default=Settings.DEFAULT_PERSIST_DIRECTORY,
-    )
-    collection = typer.prompt(
-        "What is the name for the database collection?",
-        default=Settings.DEFAULT_COLLECTION_NAME,
-    )
+        console.print("[bold blue]\n--- 🧠 Step 2: Embeddings Model ---[/bold blue]")
+        emb_provider = simple_select(
+            "Which embeddings provider do you want to use?",
+            choices=emb_choices,
+            default=_safe_default(emb_choices, cfg.embeddings_provider),
+        )
+        embeddings_base_url = RichPrompt.ask(
+            "[bold]What is your base URL for the embeddings provider? (Not needed for HuggingFace)[/bold]",
+            default=cfg.embeddings_api_base,
+        )
+        emb_model = RichPrompt.ask(
+            "[bold]Which embedding model do you want to use?[/bold]",
+            default=cfg.embeddings_model,
+        )
 
-    console.print("[bold blue]\n--- 🧠 Step 3: Embeddings Model ---[/bold blue]")
-    emb_provider = simple_select(
-        "Which embeddings provider do you want to use?",
-        choices=[
-            Settings.HUGGINGFACE,
-            Settings.OLLAMA,
-            Settings.OPENAI,
-            Settings.GOOGLE_GEMINI,
-        ],
-        default=Settings.HUGGINGFACE,
-    )
+        console.print("[bold blue]\n--- 🤖 Step 3: Language Model (LLM) ---[/bold blue]")
+        llm_provider = simple_select(
+            "Which LLM provider do you want to use?",
+            choices=llm_choices,
+            default=_safe_default(llm_choices, cfg.llm_provider),
+        )
+        llm_base_url = RichPrompt.ask(
+            "[bold]What is your base URL for the LLM provider? (Not needed for Mistral)[/bold]",
+            default=cfg.llm_api_base,
+        )
+        llm_model = RichPrompt.ask(
+            "[bold]Which LLM do you want to use?[/bold]",
+            default=cfg.llm_model,
+        )
+        k = int(simple_select(
+            "How many documents should be retrieved for context (k)?",
+            choices=k_choices,
+            default=_safe_default(k_choices, str(cfg.k)),
+        ))
 
-    default_api_base = None
-    if emb_provider == Settings.OLLAMA:
-        default_api_base = Settings.DEFAULT_OLLAMA_CLIENT
-    elif emb_provider == Settings.OPENAI:
-        default_api_base = Settings.DEFAULT_OPENAI_CLIENT
-    elif emb_provider == Settings.GOOGLE_GEMINI:
-        default_api_base = Settings.DEFAULT_GOOGLE_CLIENT
-
-    embeddings_base_url = RichPrompt.ask(
-        "[bold]What is your base URL for the embeddings provider? (Not needed for HuggingFace)[/bold]",
-        default=default_api_base,
-    )
-    emb_model = RichPrompt.ask(
-        "[bold]Which embedding model do you want to use?[/bold]",
-        default=Settings.DEFAULT_EMBEDDINGS_MODEL,
-    )
-
-    console.print("[bold blue]\n--- 🤖 Step 4: Language Model (LLM) ---[/bold blue]")
-    llm_provider = simple_select(
-        "Which LLM provider do you want to use?",
-        choices=[
-            Settings.OLLAMA,
-            Settings.MISTRAL,
-            Settings.OPENAI,
-            Settings.LMSTUDIO,
-            Settings.GOOGLE_GEMINI,
-        ],
-        default=Settings.OLLAMA,
-    )
-
-    llm_default_api_base = None
-    if llm_provider == Settings.OLLAMA:
-        llm_default_api_base = Settings.DEFAULT_OLLAMA_CLIENT
-    elif llm_provider == Settings.OPENAI:
-        llm_default_api_base = Settings.DEFAULT_OPENAI_CLIENT
-    elif llm_provider == Settings.LMSTUDIO:
-        llm_default_api_base = Settings.DEFAULT_LMSTUDIO_CLIENT
-    elif llm_provider == Settings.GOOGLE_GEMINI:
-        llm_default_api_base = Settings.DEFAULT_GOOGLE_CLIENT
-
-    llm_base_url = RichPrompt.ask(
-        "[bold]What is your base URL for the LLM provider? (Not needed for Mistral)[/bold]",
-        default=llm_default_api_base,
-    )
-
-    llm_model = RichPrompt.ask(
-        "[bold]Which LLM do you want to use?[/bold]",
-        default=Settings.DEFAULT_LLM,
-    )
-    k = simple_select(
-        "How many documents should be retrieved for context (k)?",
-        choices=["5", "10", "15"],
-        default=str(Settings.DEFAULT_K),
-    )
-    k = int(k)
-
-    console.print("[bold green]\n✅ Configuration complete![/bold green]")
+    # ── Step 2: Knowledge base ─────────────────────────────────────────────────
+    env_data_path = os.environ.get("RAGLIGHT_DATA_PATH")
+    if env_data_path:
+        data_path = Path(env_data_path)
+        if not data_path.is_dir():
+            console.print(f"[bold red]❌ RAGLIGHT_DATA_PATH '{env_data_path}' is not a valid directory.[/bold red]")
+            raise typer.Exit(code=1)
+        github_sources = []
+        ignore_folders = Settings.DEFAULT_IGNORE_FOLDERS.copy()
+        if headless:
+            console.print(f"  Data path    : [cyan]{data_path}[/cyan]")
+    else:
+        data_path, github_sources = prompt_data_sources()
+        ignore_folders = Settings.DEFAULT_IGNORE_FOLDERS.copy()
 
     try:
-        console.print("[bold cyan]\n--- ⏳ Step 5: Indexing Documents ---[/bold cyan]")
-
+        console.print("[bold cyan]\n--- ⏳ Indexing Documents ---[/bold cyan]")
         should_index = True
         if os.path.exists(db_path) and len(os.listdir(db_path)) > 0:
             console.print(f"[yellow]A database seems to exist at '{db_path}'.[/yellow]")
@@ -368,17 +362,26 @@ def interactive_chat_command():
                 console.print("🤖 : See you soon 👋")
                 break
 
-            with Progress(
-                SpinnerColumn(style="cyan"),
-                TextColumn("[bold cyan]Waiting for response...[/bold cyan]"),
-                transient=True,
+            full_response = ""
+            with Live(
+                Panel(
+                    Markdown(""),
+                    border_style="cyan",
+                    title="[bold cyan]🤖[/bold cyan]",
+                ),
                 console=console,
-            ) as progress:
-                task = progress.add_task("", total=None)
-                response = rag_pipeline.generate(query)
-                progress.update(task, completed=1)
-
-            print_llm_response(response)
+                refresh_per_second=15,
+                vertical_overflow="visible",
+            ) as live:
+                for chunk in rag_pipeline.generate_streaming(query):
+                    full_response += chunk
+                    live.update(
+                        Panel(
+                            Markdown(full_response),
+                            border_style="cyan",
+                            title="[bold cyan]🤖[/bold cyan]",
+                        )
+                    )
 
     except Exception as e:
         console.print(f"[bold red]❌ An unexpected error occurred: {e}[/bold red]")
@@ -392,142 +395,123 @@ def interactive_chat_command():
 def interactive_agentic_chat_command():
     """
     Starts a guided, interactive session to configure, index, and chat with your data.
+    Tip: set RAGLIGHT_* env vars (or a .env file) to skip the wizard entirely.
     """
-    console.print(
-        "[bold magenta]👋 Welcome to the RAGLight Interactive Setup Wizard![/bold magenta]"
-    )
-    console.print(
-        "[magenta]I will guide you through setting up your RAG pipeline.[/magenta]"
-    )
+    console.print(RAGLIGHT_BANNER)
 
-    data_path, github_sources = prompt_data_sources()
+    from raglight.api.server_config import ServerConfig
 
-    # Configure ignore folders
-    console.print(
-        "[bold cyan]\n--- 🚫 Step 1.5: Ignore Folders Configuration ---[/bold cyan]"
-    )
-    console.print(
-        "[yellow]By default, the following folders will be ignored during indexing:[/yellow]"
-    )
-    default_ignore_folders = Settings.DEFAULT_IGNORE_FOLDERS
-    for folder in default_ignore_folders:
-        console.print(f"  • {folder}")
+    load_dotenv(dotenv_path=Path(".env"))
+    cfg = ServerConfig()
 
-    if typer.confirm(
-        "Do you want to customize the ignore folders list?", default=False
-    ):
-        ignore_folders = []
-        console.print(
-            "[cyan]Enter folder names to ignore (one per line, press Enter twice to finish):[/cyan]"
-        )
-        console.print(
-            "[yellow]Leave empty to use default list, or type 'default' to use default list[/yellow]"
-        )
+    _raglight_env_vars = [
+        "RAGLIGHT_LLM_MODEL", "RAGLIGHT_LLM_PROVIDER", "RAGLIGHT_EMBEDDINGS_MODEL",
+        "RAGLIGHT_EMBEDDINGS_PROVIDER", "RAGLIGHT_PERSIST_DIR", "RAGLIGHT_COLLECTION",
+    ]
+    headless = any(os.environ.get(v) for v in _raglight_env_vars)
 
-        while True:
-            folder = input("Folder to ignore (or Enter to finish): ").strip()
-            if not folder:
-                break
-            if folder.lower() == "default":
-                ignore_folders = default_ignore_folders.copy()
-                break
-            ignore_folders.append(folder)
+    emb_choices = [Settings.HUGGINGFACE, Settings.OLLAMA, Settings.OPENAI, Settings.GOOGLE_GEMINI]
+    llm_choices = [Settings.OLLAMA, Settings.MISTRAL, Settings.OPENAI, Settings.LMSTUDIO, Settings.GOOGLE_GEMINI]
+    k_choices = ["5", "10", "15"]
 
-        if not ignore_folders:
-            ignore_folders = default_ignore_folders.copy()
+    # ── Step 1: Model / DB config ──────────────────────────────────────────────
+    if headless:
+        db_path = cfg.persist_dir
+        collection = cfg.collection
+        emb_provider = cfg.embeddings_provider
+        embeddings_base_url = cfg.embeddings_api_base
+        emb_model = cfg.embeddings_model
+        llm_provider = cfg.llm_provider
+        llm_base_url = cfg.llm_api_base
+        llm_model = cfg.llm_model
+        k = cfg.k
+
+        console.print("[bold magenta]🚀 RAGLight Agentic Chat[/bold magenta]")
+        console.print(f"  LLM          : [cyan]{llm_provider}[/cyan] / [cyan]{llm_model}[/cyan]")
+        console.print(f"  Embeddings   : [cyan]{emb_provider}[/cyan] / [cyan]{emb_model}[/cyan]")
+        console.print(f"  Persist dir  : [cyan]{db_path}[/cyan]")
+        console.print(f"  Collection   : [cyan]{collection}[/cyan]")
+        console.print(f"  k            : [cyan]{k}[/cyan]")
     else:
-        ignore_folders = default_ignore_folders.copy()
+        console.print(
+            "[bold magenta]👋 Welcome to the RAGLight Interactive Setup Wizard![/bold magenta]"
+        )
+        console.print(
+            "[magenta]I will guide you through setting up your RAG pipeline.[/magenta]"
+        )
+        console.print(
+            "[dim]Tip: create a .env file with RAGLIGHT_* vars to skip the model setup.[/dim]\n"
+        )
 
-    console.print(
-        f"[green]✅ Will ignore {len(ignore_folders)} folders during indexing[/green]"
-    )
+        console.print("[bold cyan]\n--- 💾 Step 1: Vector Database ---[/bold cyan]")
+        db_path = typer.prompt(
+            "Where should the vector database be stored?",
+            default=cfg.persist_dir,
+        )
+        collection = typer.prompt(
+            "What is the name for the database collection?",
+            default=cfg.collection,
+        )
 
-    console.print("[bold cyan]\n--- 💾 Step 2: Vector Database ---[/bold cyan]")
-    db_path = typer.prompt(
-        "Where should the vector database be stored?",
-        default=Settings.DEFAULT_PERSIST_DIRECTORY,
-    )
-    collection = typer.prompt(
-        "What is the name for the database collection?",
-        default=Settings.DEFAULT_COLLECTION_NAME,
-    )
+        console.print("[bold blue]\n--- 🧠 Step 2: Embeddings Model ---[/bold blue]")
+        emb_provider = simple_select(
+            "Which embeddings provider do you want to use?",
+            choices=emb_choices,
+            default=_safe_default(emb_choices, cfg.embeddings_provider),
+        )
+        embeddings_base_url = RichPrompt.ask(
+            "[bold]What is your base URL for the embeddings provider? (Not needed for HuggingFace)[/bold]",
+            default=cfg.embeddings_api_base,
+        )
+        emb_model = RichPrompt.ask(
+            "[bold]Which embedding model do you want to use?[/bold]",
+            default=cfg.embeddings_model,
+        )
 
-    console.print("[bold blue]\n--- 🧠 Step 3: Embeddings Model ---[/bold blue]")
-    emb_provider = simple_select(
-        "Which embeddings provider do you want to use?",
-        choices=[
-            Settings.HUGGINGFACE,
-            Settings.OLLAMA,
-            Settings.OPENAI,
-            Settings.GOOGLE_GEMINI,
-        ],
-        default=Settings.HUGGINGFACE,
-    )
+        console.print("[bold blue]\n--- 🤖 Step 3: Language Model (LLM) ---[/bold blue]")
+        llm_provider = simple_select(
+            "Which LLM provider do you want to use?",
+            choices=llm_choices,
+            default=_safe_default(llm_choices, cfg.llm_provider),
+        )
+        llm_base_url = RichPrompt.ask(
+            "[bold]What is your base URL for the LLM provider? (Not needed for Mistral)[/bold]",
+            default=cfg.llm_api_base,
+        )
+        llm_model = RichPrompt.ask(
+            "[bold]Which LLM do you want to use?[/bold]",
+            default=cfg.llm_model,
+        )
+        k = int(simple_select(
+            "How many documents should be retrieved for context (k)?",
+            choices=k_choices,
+            default=_safe_default(k_choices, str(cfg.k)),
+        ))
 
-    default_api_base = None
-    if emb_provider == Settings.OLLAMA:
-        default_api_base = Settings.DEFAULT_OLLAMA_CLIENT
-    elif emb_provider == Settings.OPENAI:
-        default_api_base = Settings.DEFAULT_OPENAI_CLIENT
-    elif emb_provider == Settings.GOOGLE_GEMINI:
-        default_api_base = Settings.DEFAULT_GOOGLE_CLIENT
+    # ── Step 2: Knowledge base ─────────────────────────────────────────────────
+    env_data_path = os.environ.get("RAGLIGHT_DATA_PATH")
+    if env_data_path:
+        data_path = Path(env_data_path)
+        if not data_path.is_dir():
+            console.print(f"[bold red]❌ RAGLIGHT_DATA_PATH '{env_data_path}' is not a valid directory.[/bold red]")
+            raise typer.Exit(code=1)
+        github_sources = []
+        ignore_folders = Settings.DEFAULT_IGNORE_FOLDERS.copy()
+        if headless:
+            console.print(f"  Data path    : [cyan]{data_path}[/cyan]")
+    else:
+        data_path, github_sources = prompt_data_sources()
+        ignore_folders = Settings.DEFAULT_IGNORE_FOLDERS.copy()
 
-    embeddings_base_url = RichPrompt.ask(
-        "[bold]What is your base URL for the embeddings provider? (Not needed for HuggingFace)[/bold]",
-        default=default_api_base,
-    )
-    emb_model = RichPrompt.ask(
-        "[bold]Which embedding model do you want to use?[/bold]",
-        default=Settings.DEFAULT_EMBEDDINGS_MODEL,
-    )
-
-    console.print("[bold blue]\n--- 🤖 Step 4: Language Model (LLM) ---[/bold blue]")
-    llm_provider = simple_select(
-        "Which LLM provider do you want to use?",
-        choices=[
-            Settings.OLLAMA,
-            Settings.MISTRAL,
-            Settings.OPENAI,
-            Settings.LMSTUDIO,
-            Settings.GOOGLE_GEMINI,
-        ],
-        default=Settings.OLLAMA,
-    )
-
+    # Derive API key from provider (reads from env vars via Settings)
     api_key = None
-    llm_default_api_base = None
-    if llm_provider == Settings.OLLAMA:
-        llm_default_api_base = Settings.DEFAULT_OLLAMA_CLIENT
-    elif llm_provider == Settings.OPENAI:
-        llm_default_api_base = Settings.DEFAULT_OPENAI_CLIENT
+    if llm_provider == Settings.OPENAI:
         api_key = Settings.OPENAI_API_KEY
-    elif llm_provider == Settings.LMSTUDIO:
-        llm_default_api_base = Settings.DEFAULT_LMSTUDIO_CLIENT
     elif llm_provider == Settings.GOOGLE_GEMINI:
         api_key = Settings.GEMINI_API_KEY
-        llm_default_api_base = Settings.DEFAULT_GOOGLE_CLIENT
-
-    llm_base_url = RichPrompt.ask(
-        "[bold]What is your base URL for the LLM provider? (Not needed for Mistral)[/bold]",
-        default=llm_default_api_base,
-    )
-
-    llm_model = RichPrompt.ask(
-        "[bold]Which LLM do you want to use?[/bold]",
-        default=Settings.DEFAULT_LLM,
-    )
-    k = simple_select(
-        "How many documents should be retrieved for context (k)?",
-        choices=["5", "10", "15"],
-        default=str(Settings.DEFAULT_K),
-    )
-    k = int(k)
-
-    console.print("[bold green]\n✅ Configuration complete![/bold green]")
 
     try:
-        console.print("[bold cyan]\n--- ⏳ Step 5: Indexing Documents ---[/bold cyan]")
-
+        console.print("[bold cyan]\n--- ⏳ Indexing Documents ---[/bold cyan]")
         should_index = True
         if os.path.exists(db_path) and len(os.listdir(db_path)) > 0:
             console.print(f"[yellow]A database seems to exist at '{db_path}'.[/yellow]")
@@ -568,9 +552,6 @@ def interactive_agentic_chat_command():
             )
             console.print("[bold green]✅ Indexing complete.[/bold green]")
         else:
-            console.print(
-                "[bold yellow]Skipping indexing, using existing database.[/bold yellow]"
-            )
             console.print(
                 "[bold yellow]Skipping indexing, using existing database.[/bold yellow]"
             )

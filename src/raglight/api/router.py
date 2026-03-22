@@ -1,9 +1,13 @@
+import asyncio
+import json
 import os
 import shutil
 import tempfile
+import threading
 from typing import List, Optional
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -63,6 +67,36 @@ def create_router() -> APIRouter:
             return GenerateResponse(answer=answer)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @router.post("/generate/stream")
+    async def generate_stream(request: Request, body: GenerateRequest):
+        pipeline = request.app.state.pipeline
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+
+        def produce():
+            try:
+                for chunk in pipeline.generate_streaming(body.question):
+                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
+            except Exception as e:
+                loop.call_soon_threadsafe(queue.put_nowait, {"error": str(e)})
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        threading.Thread(target=produce, daemon=True).start()
+
+        async def event_stream():
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                if isinstance(item, dict) and "error" in item:
+                    yield f"data: {json.dumps({'error': item['error']})}\n\n"
+                    break
+                yield f"data: {json.dumps({'chunk': item})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
 
     @router.post("/ingest", response_model=IngestResponse)
     async def ingest(request: Request, body: IngestRequest):
