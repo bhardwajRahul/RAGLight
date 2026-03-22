@@ -15,7 +15,6 @@ class RAGConfig:
     provider: str = field(default=Settings.OLLAMA)
     system_prompt: str = field(default=Settings.DEFAULT_SYSTEM_PROMPT)
     k: int = field(default=2)
-    stream: bool = field(default=False)
     knowledge_base: Optional[List[DataSource]] = field(default=None)
     ignore_folders: list = field(
         default_factory=lambda: list(Settings.DEFAULT_IGNORE_FOLDERS)

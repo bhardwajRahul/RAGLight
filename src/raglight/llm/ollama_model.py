@@ -4,7 +4,6 @@ from typing_extensions import override
 from ..config.settings import Settings
 from .llm import LLM
 from ollama import Client
-from json import dumps
 import logging
 
 # https://docs.ollama.com/context-length
@@ -124,7 +123,7 @@ class OllamaModel(LLM):
     @override
     def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
         """
-        Generates text using the Ollama model.
+        Generates text using the Ollama model in streaming mode.
 
         Args:
             input (Dict[str, Any]): A dictionary containing the input data for text generation. The structure should
@@ -133,16 +132,23 @@ class OllamaModel(LLM):
         Yields:
               str: Chunks of the generated output as they become available.
         """
-        input["system prompt"] = self.system_prompt
-        new_input = dumps(input)
+        history = input.get("history", [])
+        messages = []
+        messages.append({"role": "system", "content": self.system_prompt})
+        if history:
+            messages.extend(history)
+
+        user_prompt = input.get("question", "")
+        user_message = {"role": self.role, "content": user_prompt}
+
+        if "images" in input:
+            images = [img["bytes"] for img in input["images"]]
+            user_message["images"] = images
+        messages.append(user_message)
+
         response = self.model.chat(
             model=self.model_name,
-            messages=[
-                {
-                    "role": self.role,
-                    "content": new_input,
-                },
-            ],
+            messages=messages,
             options=self.options,
             stream=True,
         )

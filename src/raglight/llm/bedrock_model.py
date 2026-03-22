@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, Dict, Any
+from typing import Iterable, Optional, Dict, Any
 from typing_extensions import override
 import logging
 
@@ -91,3 +91,23 @@ class BedrockModel(LLM):
         messages.append(HumanMessage(content=input.get("question", "")))
         response = self.model.invoke(messages)
         return response.content
+
+    @override
+    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
+        history = input.get("history", [])
+        messages = []
+
+        if self.system_prompt:
+            messages.append(SystemMessage(content=self.system_prompt))
+
+        for msg in history:
+            if msg["role"] == "assistant":
+                messages.append(AIMessage(content=msg["content"]))
+            else:
+                messages.append(HumanMessage(content=msg["content"]))
+
+        messages.append(HumanMessage(content=input.get("question", "")))
+
+        for chunk in self.model.stream(messages):
+            if chunk.content:
+                yield chunk.content

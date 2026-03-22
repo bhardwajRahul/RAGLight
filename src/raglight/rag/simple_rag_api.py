@@ -1,4 +1,4 @@
-from typing import List
+from typing import Iterable, List
 import shutil
 import logging
 
@@ -43,7 +43,6 @@ class RAGPipeline:
         model_name: str = config.llm
         provider: str = config.provider
         embeddings_provider: str = vector_store_config.provider
-        stream: bool = config.stream
         k: int = config.k
         self.rag: RAG = (
             Builder()
@@ -126,3 +125,15 @@ class RAGPipeline:
         """
         response: str = self.rag.generate(question)
         return response
+
+    def generate_streaming(self, question: str) -> Iterable[str]:
+        """
+        Asks a question to the pipeline and streams the answer token by token.
+
+        Args:
+            question (str): The question to ask the pipeline.
+
+        Yields:
+            str: Successive chunks of the generated answer.
+        """
+        yield from self.rag.generate_streaming(question)

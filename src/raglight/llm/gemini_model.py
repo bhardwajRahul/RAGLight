@@ -1,8 +1,7 @@
 from __future__ import annotations
-from typing import Optional, Dict, Any
+from typing import Iterable, Optional, Dict, Any
 from typing_extensions import override
 import logging
-import json
 
 from ..config.settings import Settings
 from .llm import LLM
@@ -106,3 +105,32 @@ class GeminiModel(LLM):
         except Exception as e:
             logging.error(f"An error occurred during Gemini content generation: {e}")
             return f"Error: {e}"
+
+    @override
+    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
+        history = input.get("history", [])
+        contents = []
+
+        for msg in history:
+            role = "model" if msg["role"] == "assistant" else "user"
+            contents.append(
+                types.Content(role=role, parts=[types.Part(text=msg["content"])])
+            )
+
+        contents.append(
+            types.Content(
+                role="user", parts=[types.Part(text=input.get("question", ""))]
+            )
+        )
+
+        config = None
+        if self.system_prompt:
+            config = types.GenerateContentConfig(system_instruction=self.system_prompt)
+
+        for chunk in self.model.models.generate_content_stream(
+            model=self.model_name,
+            contents=contents,
+            config=config,
+        ):
+            if chunk.text:
+                yield chunk.text
