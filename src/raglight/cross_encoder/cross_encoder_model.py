@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, List, Tuple
+from typing import Any, List
 
 
 class CrossEncoderModel(ABC):
@@ -48,14 +48,16 @@ class CrossEncoderModel(ABC):
         return self.model
 
     @abstractmethod
-    def predict(self, quer_list: List[Tuple[str, str]]) -> List[float]:
+    def predict(self, query: str, documents: List[str], top_k: int) -> List[str]:
         """
-        Abstract method to predict the similarity scores for a list of queries.
+        Re-ranks the given documents against the query and returns the top_k most relevant.
 
         Args:
-            query_list (List[str]): A list of queries for which to predict the similarity scores.
+            query (str): The input query.
+            documents (List[str]): The list of document texts to rank.
+            top_k (int): The number of top results to return.
 
         Returns:
-            List[float]: The list of similarity scores for the input queries.
+            List[str]: The top_k re-ranked document texts.
         """
         pass

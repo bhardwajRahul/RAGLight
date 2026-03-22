@@ -121,7 +121,7 @@ class Builder:
                 "You need to set an embedding model before setting a vector store"
             )
         elif type == Settings.CHROMA:
-            search_type = kwargs.pop("search_type", Settings.SEARCH_SEMANTIC)
+            search_type = kwargs.pop("search_type", Settings.SEARCH_HYBRID)
             alpha = kwargs.pop("alpha", 0.5)
             self.vector_store = ChromaVS(
                 embeddings_model=self.embeddings,

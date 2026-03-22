@@ -53,7 +53,7 @@ class OpenAIModel(LLM):
             OpenAI: The client object to interact with OpenAI.
         """
         return OpenAI(
-            base_url=Settings.DEFAULT_OPENAI_CLIENT, api_key=Settings.OPENAI_API_KEY
+            base_url=self.api_base, api_key=Settings.OPENAI_API_KEY
         )
 
     @override
