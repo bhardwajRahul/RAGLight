@@ -1,10 +1,9 @@
 from __future__ import annotations
-from typing import Optional, Dict, Any
+from typing import Iterable, Optional, Dict, Any
 from typing_extensions import override
 from ..config.settings import Settings
 from .llm import LLM
 from mistralai import Mistral
-from json import dumps
 import logging
 
 
@@ -95,3 +94,39 @@ class MistralModel(LLM):
             messages=messages,
         )
         return response.choices[0].message.content
+
+    @override
+    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
+        history = input.get("history", [])
+        messages = []
+
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+
+        content_blocks = [{"type": "text", "text": input.get("question", "")}]
+
+        if "images" in input:
+            for image in input["images"]:
+                try:
+                    content_blocks.append(
+                        {
+                            "type": "image_url",
+                            "image_url": f"data:image/jpeg;base64,{image['base64']}",
+                        }
+                    )
+                except Exception as e:
+                    logging.error(f"Could not read image: {e}")
+
+        messages.append({"role": self.role, "content": content_blocks})
+
+        with self.model.chat.stream(
+            model=self.model_name,
+            messages=messages,
+        ) as stream:
+            for event in stream:
+                delta = event.data.choices[0].delta.content
+                if delta:
+                    yield delta

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from langchain_core.documents import Document
 from langgraph.graph import START, StateGraph
@@ -57,7 +57,6 @@ class RAG:
         llm: LLM,
         k: int,
         cross_encoder_model: CrossEncoderModel = None,
-        stream: bool = False,
         langfuse_config: Optional[LangfuseConfig] = None,
         reformulation: bool = True,
         max_history: Optional[int] = 20,
@@ -80,7 +79,6 @@ class RAG:
         self.vector_store: VectorStore = vector_store
         self.llm: LLM = llm
         self.k: int = k
-        self.stream: bool = stream
         self.reformulation: bool = reformulation
         self.max_history: Optional[int] = max_history
         self.langfuse_config: Optional[LangfuseConfig] = langfuse_config
@@ -138,6 +136,19 @@ class RAG:
         )
         return {"context": retrieved_docs, "question": state["question"]}
 
+    def _build_prompt(self, state: Dict) -> str:
+        docs_content = "\n\n".join(doc.page_content for doc in state["context"])
+        return f"""
+            Here is the retrieved context (excerpts from the document):
+            {docs_content}
+
+            Here is the question:
+            {state["question"]}
+
+
+            FINAL ANSWER (based only on the context):
+            """
+
     def _generate_graph(self, state: Dict[str, List[Document]]) -> Dict[str, str]:
         """
         Generates an answer based on the input question and retrieved context.
@@ -150,26 +161,9 @@ class RAG:
         Returns:
             Dict[str, str]: A dictionary containing the generated answer under the key 'answer'.
         """
-        docs_content = "\n\n".join(doc.page_content for doc in state["context"])
-        prompt = f"""
-            Here is the retrieved context (excerpts from the document):
-            {docs_content}
-
-            Here is the question:
-            {state["question"]}
-
-
-            FINAL ANSWER (based only on the context):
-            """
-        if self.stream:
-            response = self.llm.generate_streaming(
-                {"question": prompt, "history": state["history"]}
-            )
-        else:
-            response = self.llm.generate(
-                {"question": prompt, "history": state["history"]}
-            )
-            return {"answer": response}
+        prompt = self._build_prompt(state)
+        response = self.llm.generate({"question": prompt, "history": state["history"]})
+        return {"answer": response}
 
     def _rerank(self, state: Dict[str, List[Document]]) -> Dict[str, List[Document]]:
         """
@@ -275,3 +269,49 @@ class RAG:
             ]
         )
         return answer
+
+    def generate_streaming(self, question: str) -> Iterable[str]:
+        """
+        Executes the RAG pipeline and streams the answer token by token.
+
+        Runs reformulation, retrieval, and reranking via the existing methods,
+        then delegates to the LLM's streaming interface.
+
+        Args:
+            question (str): The input question.
+
+        Yields:
+            str: Successive chunks of the generated answer.
+        """
+        if self.max_history is not None:
+            self.state["history"] = self.state["history"][-self.max_history :]
+
+        state: Dict = {
+            "question": question,
+            "context": [],
+            "history": list(self.state["history"]),
+        }
+
+        if self.reformulation:
+            state.update(self._reformulate(state))
+
+        state.update(self._retrieve(state))
+
+        if self.cross_encoder:
+            state.update(self._rerank(state))
+
+        prompt = self._build_prompt(state)
+
+        full_answer = ""
+        for chunk in self.llm.generate_streaming(
+            {"question": prompt, "history": state["history"]}
+        ):
+            full_answer += chunk
+            yield chunk
+
+        self.state["history"].extend(
+            [
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": full_answer},
+            ]
+        )

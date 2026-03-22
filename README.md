@@ -53,6 +53,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
   - [Override Default Processors](#override-default-processors)
   - [Hybrid Search](#hybrid-search-bm25--semantic--rrf-)
   - [Query Reformulation](#query-reformulation-✍️)
+  - [Streaming Output](#streaming-output-⚡)
   - [Conversation History](#conversation-history-💬)
   - [AWS Bedrock](#aws-bedrock-☁️)
   - [Observability with Langfuse](#observability-with-langfuse)
@@ -91,6 +92,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 - 🔍 **Hybrid Search (BM25 + Semantic + RRF)**: Combine keyword-based BM25 retrieval with dense vector search using Reciprocal Rank Fusion for best-of-both-worlds results.
 - ✍️ **Query Reformulation**: Automatically rewrites follow-up questions into standalone queries using conversation history, improving retrieval accuracy in multi-turn conversations.
 - 💬 **Conversation History**: Full multi-turn history supported across all providers (Ollama, OpenAI, Mistral, LMStudio, Gemini, Bedrock) with optional `max_history` cap.
+- ⚡ **Streaming Output**: Token-by-token streaming via `generate_streaming()` on all providers — drop-in alongside `generate()` with no extra configuration.
 - ☁️ **AWS Bedrock**: Use Claude, Titan, Llama and other Bedrock models for both LLM inference and embeddings.
 - 📊 **Langfuse Observability (v3+)**: Trace every RAG call end-to-end — retrieve, rerank, and generate — directly in your Langfuse dashboard.
 
@@ -797,6 +799,41 @@ The reformulated question is logged at `INFO` level so you can inspect what the 
 ```
 reformulate → retrieve → [rerank?] → generate
 ```
+
+---
+
+### Streaming Output ⚡
+
+All providers support token-by-token streaming via `generate_streaming()`. It runs the full pipeline (reformulation → retrieval → reranking) and yields answer chunks as they arrive from the LLM.
+
+#### With RAGPipeline
+
+```python
+pipeline = RAGPipeline(config, vector_store_config)
+pipeline.build()
+
+for chunk in pipeline.generate_streaming("How does RAGLight work?"):
+    print(chunk, end="", flush=True)
+print()
+```
+
+#### With the Builder API
+
+```python
+rag = (
+    Builder()
+    .with_embeddings(Settings.HUGGINGFACE, model_name="all-MiniLM-L6-v2")
+    .with_vector_store(Settings.CHROMA, persist_directory="./myDb", collection_name="col")
+    .with_llm(Settings.OLLAMA, model_name="llama3.1:8b")
+    .build_rag(k=5)
+)
+
+for chunk in rag.generate_streaming("Explain the retrieval pipeline"):
+    print(chunk, end="", flush=True)
+print()
+```
+
+Streaming is supported by all providers: **Ollama**, **OpenAI**, **vLLM**, **LMStudio**, **Mistral**, **Google Gemini**, and **AWS Bedrock**. Conversation history is updated automatically at the end of the stream.
 
 ---
 

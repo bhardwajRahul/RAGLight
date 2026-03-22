@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from ..config.settings import Settings
 
@@ -71,6 +71,19 @@ class LLM(ABC):
                                     and required keys depend on the specific LLM implementation.
 
         Returns:
-            Any: The generated output from the model.
+            str: The generated output from the model.
+        """
+        pass
+
+    @abstractmethod
+    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
+        """
+        Abstract method to generate text in streaming mode.
+
+        Args:
+            input (Dict[str, Any]): A dictionary containing the input data for text generation.
+
+        Yields:
+            str: Successive chunks of the generated output.
         """
         pass
