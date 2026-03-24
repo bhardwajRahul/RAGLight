@@ -41,7 +41,7 @@ Query → VectorStore.similarity_search() → [CrossEncoder rerank] → LLM.gene
 |---|---|---|
 | `LLM` | `src/raglight/llm/llm.py` | Ollama, LMStudio, Mistral, OpenAI, Gemini |
 | `EmbeddingsModel` | `src/raglight/embeddings/embeddings_model.py` | HuggingFace, Ollama, OpenAI, Gemini |
-| `VectorStore` | `src/raglight/vectorstore/vector_store.py` | ChromaVS only |
+| `VectorStore` | `src/raglight/vectorstore/vector_store.py` | ChromaVS (`raglight[chroma]`), QdrantVS (`raglight[qdrant]`) |
 | `DocumentProcessor` | `src/raglight/document_processing/document_processor.py` | PDF, Code, Text, VLM-PDF |
 
 ### Extending the library
@@ -58,9 +58,22 @@ Query → VectorStore.similarity_search() → [CrossEncoder rerank] → LLM.gene
 - `src/raglight/rag/rag.py` — `RAG` (core LangGraph state machine)
 - `src/raglight/rag/simple_agentic_rag_api.py` — `AgenticRAGPipeline` (agent mode with MCP tools)
 
+### Vector store extras
+
+Vector store backends are optional dependencies — only install what you need:
+
+| Constant | Extra | Notes |
+|---|---|---|
+| `Settings.CHROMA` | `raglight[chroma]` | Requires C++ compiler on Windows |
+| `Settings.QDRANT` | `raglight[qdrant]` | Pure Python, Windows-friendly |
+
+`ChromaVS` and `QdrantVS` are lazy-loaded in `src/raglight/__init__.py` — importing `raglight` never fails even if neither extra is installed.
+
+The env var `RAGLIGHT_DB` (default: `Chroma`) controls which backend is used by the CLI (`raglight chat`, `raglight agentic-chat`) and the REST API (`raglight serve`). `RAGLIGHT_DB_HOST` / `RAGLIGHT_DB_PORT` configure remote mode.
+
 ### Configuration
 
-All configs are `@dataclass` in `src/raglight/config/`. Provider constants (e.g. `Settings.OLLAMA`, `Settings.CHROMA`) are defined in `src/raglight/config/settings.py`.
+All configs are `@dataclass` in `src/raglight/config/`. Provider constants (e.g. `Settings.OLLAMA`, `Settings.CHROMA`, `Settings.QDRANT`) are defined in `src/raglight/config/settings.py`.
 
 ## Testing conventions
 

@@ -1,6 +1,6 @@
 [project]
 name = "raglight"
-version = "3.3.3"
+version = "3.4.0"
 description = "RAGLight is a lightweight and modular Python library for implementing Retrieval-Augmented Generation (RAG). It enhances the capabilities of Large Language Models (LLMs) by combining document retrieval with natural language inference."
 authors = [
     {name = "Bessouat40",email = "roman.bessouat@orange.fr"}
@@ -20,7 +20,6 @@ dependencies = [
     "langchain-text-splitters==1.1.0",
     "langchain-core==1.2.5",
     "langgraph==1.0.5",
-    "chromadb==0.5.23",
     "sentence-transformers==5.1.2",
     "pymupdf==1.26.7",
     "ollama==0.6.1",
@@ -41,6 +40,8 @@ dependencies = [
 ]
 [project.optional-dependencies]
 langfuse = ["langfuse==4.0.0"]
+chroma = ["chromadb==0.5.23"]
+qdrant = ["qdrant-client==1.17.0"]
 
 [project.scripts]
 raglight = "raglight.cli.main:app"

@@ -54,13 +54,16 @@ class ServerConfig:
             "RAGLIGHT_SYSTEM_PROMPT", Settings.DEFAULT_SYSTEM_PROMPT
         )
     )
-    chroma_host: Optional[str] = field(
-        default_factory=lambda: os.environ.get("RAGLIGHT_CHROMA_HOST") or None
+    db: str = field(
+        default_factory=lambda: os.environ.get("RAGLIGHT_DB", Settings.CHROMA)
     )
-    chroma_port: Optional[int] = field(
+    db_host: Optional[str] = field(
+        default_factory=lambda: os.environ.get("RAGLIGHT_DB_HOST") or None
+    )
+    db_port: Optional[int] = field(
         default_factory=lambda: (
-            int(os.environ.get("RAGLIGHT_CHROMA_PORT"))
-            if os.environ.get("RAGLIGHT_CHROMA_PORT")
+            int(os.environ.get("RAGLIGHT_DB_PORT"))
+            if os.environ.get("RAGLIGHT_DB_PORT")
             else None
         )
     )
@@ -100,9 +103,9 @@ class ServerConfig:
             embedding_model=self.embeddings_model,
             provider=self.embeddings_provider,
             api_base=self.embeddings_api_base,
-            persist_directory=self.persist_dir if not self.chroma_host else None,
-            host=self.chroma_host,
-            port=self.chroma_port,
-            database=Settings.CHROMA,
+            persist_directory=self.persist_dir if not self.db_host else None,
+            host=self.db_host,
+            port=self.db_port,
+            database=self.db,
             collection_name=self.collection,
         )

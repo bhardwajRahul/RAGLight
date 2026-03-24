@@ -18,6 +18,7 @@ class Settings:
         )
 
     CHROMA = "Chroma"
+    QDRANT = "Qdrant"
     OLLAMA = "Ollama"
     MISTRAL = "Mistral"
     VLLM = "vLLM"

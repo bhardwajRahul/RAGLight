@@ -52,6 +52,7 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
   - [Use Custom Pipeline](#use-custom-pipeline)
   - [Override Default Processors](#override-default-processors)
   - [Hybrid Search](#hybrid-search-bm25--semantic--rrf-)
+  - [Qdrant Vector Store](#qdrant-vector-store-️)
   - [Query Reformulation](#query-reformulation-✍️)
   - [Streaming Output](#streaming-output-⚡)
   - [Conversation History](#conversation-history-💬)
@@ -100,10 +101,25 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 
 ## Import library 🛠️
 
-To install the library, run:
+Install the base library:
 
 ```bash
 pip install raglight
+```
+
+RAGLight uses **optional extras** for vector store backends, so you only install what you need:
+
+| Extra | Package installed | Notes |
+|---|---|---|
+| `raglight[chroma]` | `chromadb` | Requires a C++ compiler on Windows |
+| `raglight[qdrant]` | `qdrant-client` | Pure Python — works on Windows without a C++ compiler |
+| `raglight[langfuse]` | `langfuse` | Observability tracing |
+
+```bash
+pip install "raglight[qdrant]"           # Qdrant only (Windows-friendly)
+pip install "raglight[chroma]"           # ChromaDB only
+pip install "raglight[chroma,qdrant]"    # both
+pip install "raglight[qdrant,langfuse]"  # Qdrant + observability
 ```
 
 ---
@@ -315,13 +331,15 @@ All server settings are read from `RAGLIGHT_*` environment variables. Copy `exam
 | `RAGLIGHT_EMBEDDINGS_MODEL` | `all-MiniLM-L6-v2` | Embeddings model name |
 | `RAGLIGHT_EMBEDDINGS_PROVIDER` | `HuggingFace` | Embeddings provider (`HuggingFace`, `Ollama`, `OpenAI`, `GoogleGemini`) |
 | `RAGLIGHT_EMBEDDINGS_API_BASE` | `http://localhost:11434` | Embeddings API base URL |
-| `RAGLIGHT_PERSIST_DIR` | `./raglight_db` | Local ChromaDB persistence directory |
-| `RAGLIGHT_COLLECTION` | `default` | ChromaDB collection name |
+| `RAGLIGHT_DB` | `Chroma` | Vector store backend (`Chroma` or `Qdrant`) |
+| `RAGLIGHT_PERSIST_DIR` | `./raglight_db` | Local persistence directory (used when `RAGLIGHT_DB_HOST` is not set) |
+| `RAGLIGHT_COLLECTION` | `default` | Collection name |
 | `RAGLIGHT_K` | `5` | Number of documents retrieved per query |
 | `RAGLIGHT_SYSTEM_PROMPT` | *(default prompt)* | Custom system prompt for the LLM |
-| `RAGLIGHT_CHROMA_HOST` | — | Remote Chroma host (leave unset for local storage) |
-| `RAGLIGHT_CHROMA_PORT` | — | Remote Chroma port |
+| `RAGLIGHT_DB_HOST` | — | Remote vector store host (leave unset for local on-disk storage) |
+| `RAGLIGHT_DB_PORT` | — | Remote vector store port |
 | `RAGLIGHT_API_TIMEOUT` | `300` | Request timeout in seconds for the Streamlit UI (increase for slow models) |
+
 
 ### Deploy with Docker Compose
 
@@ -384,7 +402,12 @@ For embeddings models, you can use these providers :
 
 For your vector store, you can use :
 
-- Chroma (`Settings.CHROMA`)
+| Provider | Constant | Extra | Windows (no C++) |
+|---|---|---|---|
+| ChromaDB | `Settings.CHROMA` | `raglight[chroma]` | No — requires a C++ compiler |
+| Qdrant | `Settings.QDRANT` | `raglight[qdrant]` | Yes — pure Python client |
+
+Both support local (on-disk) and remote (HTTP) modes.
 
 ## Quick Start 🚀
 
@@ -749,6 +772,67 @@ print(response)
 > **How RRF works**: each search mode returns its own ranked list of documents. RRF assigns a score of `1 / (k + rank)` to each document per list and sums them — documents appearing high in both lists are promoted, while documents unique to one list are kept but ranked lower. This gives the hybrid mode better recall and precision than either mode alone.
 
 > See the full working example in [examples/hybrid_search_example.py](examples/hybrid_search_example.py).
+
+---
+
+### Qdrant Vector Store 🗄️
+
+Qdrant is a pure-Python alternative to ChromaDB — **no C++ compiler required**, making it the recommended choice on Windows.
+
+```bash
+pip install "raglight[qdrant]"
+```
+
+#### Local mode (on-disk, no server)
+
+```python
+import uuid
+from raglight.rag.builder import Builder
+from raglight.config.settings import Settings
+
+rag = (
+    Builder()
+    .with_embeddings(Settings.HUGGINGFACE, model_name="all-MiniLM-L6-v2")
+    .with_vector_store(
+        Settings.QDRANT,
+        persist_directory="./qdrantDb",
+        collection_name=str(uuid.uuid4()),
+    )
+    .with_llm(Settings.OLLAMA, model_name="llama3.1:8b")
+    .build_rag(k=5)
+)
+
+rag.vector_store.ingest(data_path="./docs")
+response = rag.generate("What is RAGLight?")
+print(response)
+```
+
+#### Remote mode (Qdrant server)
+
+Start a Qdrant server with Docker:
+
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+Then point the builder to it:
+
+```python
+rag = (
+    Builder()
+    .with_embeddings(Settings.HUGGINGFACE, model_name="all-MiniLM-L6-v2")
+    .with_vector_store(
+        Settings.QDRANT,
+        host="localhost",
+        port=6333,
+        collection_name="my_collection",
+    )
+    .with_llm(Settings.OLLAMA, model_name="llama3.1:8b")
+    .build_rag(k=5)
+)
+```
+
+> See the full working example in [examples/qdrant_example.py](examples/qdrant_example.py).
 
 ---
 

@@ -1,5 +1,22 @@
 from .vectorstore.vector_store import VectorStore
-from .vectorstore.chroma import ChromaVS
+
+
+def __getattr__(name: str):
+    if name == "ChromaVS":
+        try:
+            from .vectorstore.chroma import ChromaVS
+        except ImportError:
+            raise ImportError(
+                "chromadb is required to use ChromaVS. "
+                "Install it with: pip install raglight[chroma]"
+            )
+        return ChromaVS
+    if name == "QdrantVS":
+        from .vectorstore.qdrant import QdrantVS
+
+        return QdrantVS
+    raise AttributeError(f"module 'raglight' has no attribute {name!r}")
+
 
 from .embeddings.embeddings_model import EmbeddingsModel
 from .embeddings.ollama_embeddings import OllamaEmbeddingsModel
