@@ -32,7 +32,9 @@ class TestRouter(unittest.TestCase):
 
     def test_generate(self):
         self.pipeline.generate.return_value = "Paris is the capital of France."
-        response = self.client.post("/generate", json={"question": "What is the capital of France?"})
+        response = self.client.post(
+            "/generate", json={"question": "What is the capital of France?"}
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"answer": "Paris is the capital of France."})
         self.pipeline.generate.assert_called_once_with("What is the capital of France?")
@@ -56,7 +58,9 @@ class TestRouter(unittest.TestCase):
         response = self.client.post("/ingest", json={})
         self.assertEqual(response.status_code, 400)
         detail = response.json()["detail"]
-        self.assertTrue(any(k in detail for k in ("data_path", "file_paths", "github_url")))
+        self.assertTrue(
+            any(k in detail for k in ("data_path", "file_paths", "github_url"))
+        )
 
     def test_ingest_github(self):
         self.vector_store.ingest.return_value = None
@@ -66,7 +70,10 @@ class TestRouter(unittest.TestCase):
             MockScrapper.return_value = instance
             response = self.client.post(
                 "/ingest",
-                json={"github_url": "https://github.com/example/repo", "github_branch": "main"},
+                json={
+                    "github_url": "https://github.com/example/repo",
+                    "github_branch": "main",
+                },
             )
         self.assertEqual(response.status_code, 200)
         instance.set_repositories.assert_called_once()
@@ -88,7 +95,9 @@ class TestRouter(unittest.TestCase):
 
     def test_ingest_file_paths_missing_file(self):
         with patch("os.path.isfile", return_value=False):
-            response = self.client.post("/ingest", json={"file_paths": ["/nonexistent/file.pdf"]})
+            response = self.client.post(
+                "/ingest", json={"file_paths": ["/nonexistent/file.pdf"]}
+            )
         self.assertEqual(response.status_code, 500)
         self.assertIn("not found", response.json()["detail"].lower())
 
@@ -116,7 +125,10 @@ class TestRouter(unittest.TestCase):
     # ── /collections ──────────────────────────────────────────────────────────
 
     def test_collections(self):
-        self.vector_store.get_available_collections.return_value = ["default", "project_x"]
+        self.vector_store.get_available_collections.return_value = [
+            "default",
+            "project_x",
+        ]
         response = self.client.get("/collections")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"collections": ["default", "project_x"]})

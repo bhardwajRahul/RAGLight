@@ -34,9 +34,13 @@ rag_semantic = (
         Settings.CHROMA,
         persist_directory=persist_directory,
         collection_name=collection_name,
-        search_type=Settings.SEARCH_SEMANTIC,   # default — can be omitted
+        search_type=Settings.SEARCH_SEMANTIC,  # default — can be omitted
     )
-    .with_llm(Settings.OLLAMA, model_name=model_name, system_prompt=Settings.DEFAULT_SYSTEM_PROMPT)
+    .with_llm(
+        Settings.OLLAMA,
+        model_name=model_name,
+        system_prompt=Settings.DEFAULT_SYSTEM_PROMPT,
+    )
     .build_rag(k=5)
 )
 rag_semantic.vector_store.ingest(data_path=data_path)
@@ -54,7 +58,11 @@ rag_bm25 = (
         collection_name=collection_name + "_bm25",
         search_type=Settings.SEARCH_BM25,
     )
-    .with_llm(Settings.OLLAMA, model_name=model_name, system_prompt=Settings.DEFAULT_SYSTEM_PROMPT)
+    .with_llm(
+        Settings.OLLAMA,
+        model_name=model_name,
+        system_prompt=Settings.DEFAULT_SYSTEM_PROMPT,
+    )
     .build_rag(k=5)
 )
 rag_bm25.vector_store.ingest(data_path=data_path)
@@ -71,9 +79,13 @@ rag_hybrid = (
         persist_directory=persist_directory,
         collection_name=collection_name + "_hybrid",
         search_type=Settings.SEARCH_HYBRID,
-        alpha=0.5,   # weight of semantic vs BM25 in the RRF merge (0=BM25 only, 1=semantic only)
+        alpha=0.5,  # weight of semantic vs BM25 in the RRF merge (0=BM25 only, 1=semantic only)
     )
-    .with_llm(Settings.OLLAMA, model_name=model_name, system_prompt=Settings.DEFAULT_SYSTEM_PROMPT)
+    .with_llm(
+        Settings.OLLAMA,
+        model_name=model_name,
+        system_prompt=Settings.DEFAULT_SYSTEM_PROMPT,
+    )
     .build_rag(k=5)
 )
 rag_hybrid.vector_store.ingest(data_path=data_path)
@@ -93,7 +105,7 @@ vector_store_config = VectorStoreConfig(
     database=Settings.CHROMA,
     persist_directory=persist_directory,
     collection_name=collection_name + "_api",
-    search_type=Settings.SEARCH_HYBRID,   # <-- hybrid mode
+    search_type=Settings.SEARCH_HYBRID,  # <-- hybrid mode
     hybrid_alpha=0.5,
 )
 

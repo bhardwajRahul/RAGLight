@@ -23,7 +23,9 @@ Settings.setup_logging()
 
 # --- Configuration -----------------------------------------------------------
 
-persist_directory = "./qdrantDb"       # local mode — change to None + set host/port for remote
+persist_directory = (
+    "./qdrantDb"  # local mode — change to None + set host/port for remote
+)
 # host = "localhost"                   # remote mode
 # port = 6333                          # remote mode (default)
 

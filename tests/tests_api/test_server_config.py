@@ -74,7 +74,11 @@ class TestServerConfigDefaults(unittest.TestCase):
         self.assertEqual(vs_config.collection_name, cfg.collection)
 
     def test_to_vector_store_config_chroma_host(self):
-        env = {**_clean_env(), "RAGLIGHT_CHROMA_HOST": "chromadb", "RAGLIGHT_CHROMA_PORT": "8000"}
+        env = {
+            **_clean_env(),
+            "RAGLIGHT_CHROMA_HOST": "chromadb",
+            "RAGLIGHT_CHROMA_PORT": "8000",
+        }
         with patch.dict(os.environ, env, clear=True):
             cfg = ServerConfig()
         vs_config = cfg.to_vector_store_config()

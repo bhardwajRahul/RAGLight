@@ -35,6 +35,7 @@ class TestBedrockModel(unittest.TestCase):
         call_args = self.model.model.invoke.call_args[0][0]
         # First message should be the system prompt, last should be human message
         from langchain_core.messages import SystemMessage, HumanMessage
+
         self.assertIsInstance(call_args[0], SystemMessage)
         self.assertIsInstance(call_args[-1], HumanMessage)
 

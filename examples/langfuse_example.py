@@ -80,6 +80,5 @@ for question in questions:
     print(f"A: {response}")
 
 print(
-    "\nAll traces have been sent to Langfuse. "
-    "Open your dashboard to inspect them."
+    "\nAll traces have been sent to Langfuse. " "Open your dashboard to inspect them."
 )
