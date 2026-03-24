@@ -64,7 +64,9 @@ class VectorStore(ABC):
                 docs.append(Document(page_content=self._bm25.corpus[idx]))
         return docs
 
-    def _rrf(self, ranked_lists: List[List[Document]], k_rrf: int = 60) -> List[Document]:
+    def _rrf(
+        self, ranked_lists: List[List[Document]], k_rrf: int = 60
+    ) -> List[Document]:
         scores: Dict[str, float] = {}
         doc_map: Dict[str, Document] = {}
         for ranked in ranked_lists:

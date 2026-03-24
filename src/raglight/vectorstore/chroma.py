@@ -46,7 +46,9 @@ class ChromaVS(VectorStore):
         search_type: str = "semantic",
         alpha: float = 0.5,
     ) -> None:
-        super().__init__(persist_directory, embeddings_model, custom_processors, search_type, alpha)
+        super().__init__(
+            persist_directory, embeddings_model, custom_processors, search_type, alpha
+        )
 
         self.persist_directory = persist_directory
         self.host = host

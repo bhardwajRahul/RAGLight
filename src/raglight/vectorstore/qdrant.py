@@ -39,7 +39,9 @@ class QdrantVS(VectorStore):
                 "Install it with: pip install raglight[qdrant]"
             )
 
-        super().__init__(persist_directory, embeddings_model, custom_processors, search_type, alpha)
+        super().__init__(
+            persist_directory, embeddings_model, custom_processors, search_type, alpha
+        )
 
         self.collection_name = collection_name
         self._classes_collection_name = f"{collection_name}_classes"
