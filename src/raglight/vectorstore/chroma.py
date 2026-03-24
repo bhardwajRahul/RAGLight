@@ -1,7 +1,6 @@
 from __future__ import annotations
 import logging
 import uuid
-from pathlib import Path
 from typing import List, Dict, Optional, Any, cast
 from typing_extensions import override
 
@@ -11,7 +10,6 @@ from langchain_core.documents import Document
 
 from ..document_processing.document_processor import DocumentProcessor
 from .vector_store import VectorStore
-from .bm25_index import BM25Index
 from ..embeddings.embeddings_model import EmbeddingsModel
 
 
@@ -48,14 +46,12 @@ class ChromaVS(VectorStore):
         search_type: str = "semantic",
         alpha: float = 0.5,
     ) -> None:
-        super().__init__(persist_directory, embeddings_model, custom_processors)
+        super().__init__(persist_directory, embeddings_model, custom_processors, search_type, alpha)
 
         self.persist_directory = persist_directory
         self.host = host
         self.port = port
         self.collection_name = collection_name
-        self.search_type = search_type
-        self.alpha = alpha
 
         self.embedding_function = ChromaEmbeddingAdapter(self.embeddings_model)
 
@@ -77,17 +73,11 @@ class ChromaVS(VectorStore):
             embedding_function=self.embedding_function,
         )
 
-        self._bm25 = BM25Index()
         bm25_path = self._bm25_path()
         if bm25_path and bm25_path.exists():
             self._bm25.load(bm25_path)
         elif search_type in ("bm25", "hybrid"):
             self._rebuild_bm25_from_chroma()
-
-    def _bm25_path(self) -> Optional[Path]:
-        if not self.persist_directory:
-            return None
-        return Path(self.persist_directory) / f"bm25_{self.collection_name}.json"
 
     def _rebuild_bm25_from_chroma(self) -> None:
         result = self.collection.get()
@@ -105,12 +95,7 @@ class ChromaVS(VectorStore):
         )
 
         self._add_docs_to_collection(self.collection, documents)
-
-        texts = [doc.page_content for doc in documents]
-        self._bm25.add_documents(texts)
-        bm25_path = self._bm25_path()
-        if bm25_path:
-            self._bm25.save(bm25_path)
+        self._update_bm25(documents)
 
         logging.info("✅ Documents successfully added to the main collection.")
 
@@ -138,51 +123,14 @@ class ChromaVS(VectorStore):
 
         collection.add(ids=ids, documents=texts, metadatas=metadatas)
 
-    def _bm25_search(self, question: str, k: int) -> List[Document]:
-        results = self._bm25.search(question, k)
-        docs = []
-        for idx, _score in results:
-            if idx < len(self._bm25.corpus):
-                docs.append(Document(page_content=self._bm25.corpus[idx]))
-        return docs
-
-    def _rrf(
-        self, ranked_lists: List[List[Document]], k_rrf: int = 60
-    ) -> List[Document]:
-        scores: Dict[str, float] = {}
-        doc_map: Dict[str, Document] = {}
-        for ranked in ranked_lists:
-            for rank, doc in enumerate(ranked):
-                key = doc.page_content[:100]
-                scores[key] = scores.get(key, 0) + 1 / (k_rrf + rank + 1)
-                doc_map[key] = doc
-        sorted_keys = sorted(scores, key=scores.__getitem__, reverse=True)
-        return [doc_map[k] for k in sorted_keys]
-
-    def _hybrid_search(
-        self, question: str, k: int, filter: Optional[Dict[str, Any]]
-    ) -> List[Document]:
-        fetch_k = k * 2
-        semantic_docs = self._query_collection(
-            self.collection, question, fetch_k, filter
-        )
-        bm25_docs = self._bm25_search(question, fetch_k)
-        return self._rrf([semantic_docs, bm25_docs])[:k]
-
     @override
-    def similarity_search(
+    def _semantic_search(
         self,
         question: str,
-        k: int = 5,
-        filter: Optional[Dict[str, str]] = None,
+        k: int,
+        filter: Optional[Dict[str, Any]],
         collection_name: Optional[str] = None,
     ) -> List[Document]:
-        if self.search_type == "bm25":
-            return self._bm25_search(question, k)
-        elif self.search_type == "hybrid":
-            return self._hybrid_search(question, k, filter)
-
-        # semantic (default)
         target_collection = self.collection
         if collection_name and collection_name != self.collection.name:
             target_collection = self.client.get_or_create_collection(
@@ -230,9 +178,6 @@ class ChromaVS(VectorStore):
 
     @override
     def get_available_collections(self) -> List[str]:
-        """
-        Retrieves the list of available collections in the ChromaDB.
-        """
         try:
             collections = self.client.list_collections()
             return [col.name for col in collections]
