@@ -1,66 +1,40 @@
 import unittest
 from unittest.mock import MagicMock, patch
+
 from raglight.embeddings.gemini_embeddings import GeminiEmbeddingsModel
 from ..test_config import TestsConfig
-from google.genai import types
 
 
 class TestGeminiEmbeddings(unittest.TestCase):
 
-    @patch("raglight.embeddings.gemini_embeddings.Client")
-    def test_model_load(self, MockClient: MagicMock):
-        """
-        Test that the client is instantiated with the correct parameters.
-        Note: The code uses Client(...) instead of configure().
-        """
+    @patch("raglight.embeddings.gemini_embeddings.GoogleGenerativeAIEmbeddings")
+    def test_model_load(self, MockEmbeddings: MagicMock):
         model = GeminiEmbeddingsModel(TestsConfig.GEMINI_EMBEDDING_MODEL)
+        self.assertTrue(MockEmbeddings.called)
+        self.assertIsNotNone(model.model)
 
-        self.assertTrue(MockClient.called)
-
-        self.assertIsNotNone(
-            model.model, "Model (genai client instance) should be loaded."
-        )
-
-    @patch("raglight.embeddings.gemini_embeddings.Client")
-    def test_embed_documents(self, MockClient: MagicMock):
-        """Test document embedding with the correct task_type."""
-        mock_client_instance = MockClient.return_value
-
-        mock_client_instance.embed_content.return_value = {
-            "embedding": [[0.1, 0.2], [0.3, 0.4]]
-        }
+    @patch("raglight.embeddings.gemini_embeddings.GoogleGenerativeAIEmbeddings")
+    def test_embed_documents(self, MockEmbeddings: MagicMock):
+        mock_instance = MockEmbeddings.return_value
+        mock_instance.embed_documents.return_value = [[0.1, 0.2], [0.3, 0.4]]
 
         model = GeminiEmbeddingsModel(TestsConfig.GEMINI_EMBEDDING_MODEL)
         texts = ["doc1", "doc2"]
-
         result = model.embed_documents(texts)
 
         self.assertEqual(len(result), 2)
+        mock_instance.embed_documents.assert_called_with(texts)
 
-        mock_client_instance.embed_content.assert_called_with(
-            model=TestsConfig.GEMINI_EMBEDDING_MODEL,
-            content=texts,
-            task_type="retrieval_document",
-        )
-
-    @patch("raglight.embeddings.gemini_embeddings.Client")
-    def test_embed_query(self, MockClient: MagicMock):
-        """Test query embedding with the correct task_type."""
-        mock_client_instance = MockClient.return_value
-        mock_client_instance.embed_content.return_value = {"embedding": [0.1, 0.2]}
+    @patch("raglight.embeddings.gemini_embeddings.GoogleGenerativeAIEmbeddings")
+    def test_embed_query(self, MockEmbeddings: MagicMock):
+        mock_instance = MockEmbeddings.return_value
+        mock_instance.embed_query.return_value = [0.1, 0.2]
 
         model = GeminiEmbeddingsModel(TestsConfig.GEMINI_EMBEDDING_MODEL)
-        text = "query"
-
-        result = model.embed_query(text)
+        result = model.embed_query("query")
 
         self.assertEqual(len(result), 2)
-
-        mock_client_instance.embed_content.assert_called_with(
-            model=TestsConfig.GEMINI_EMBEDDING_MODEL,
-            content=text,
-            task_type="retrieval_query",
-        )
+        mock_instance.embed_query.assert_called_with("query")
 
 
 if __name__ == "__main__":

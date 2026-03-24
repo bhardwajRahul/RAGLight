@@ -1,48 +1,41 @@
 import unittest
 from unittest.mock import MagicMock, patch
+
 from raglight.embeddings.ollama_embeddings import OllamaEmbeddingsModel
 from ..test_config import TestsConfig
 
 
 class TestOllamaEmbeddings(unittest.TestCase):
 
-    @patch("raglight.embeddings.ollama_embeddings.Client")
-    def test_model_load(self, mock_client: MagicMock):
-        """Test Ollama client initialization."""
-        mock_client.return_value = MagicMock()
+    @patch("raglight.embeddings.ollama_embeddings.OllamaEmbeddings")
+    def test_model_load(self, MockEmbeddings: MagicMock):
+        MockEmbeddings.return_value = MagicMock()
         embeddings = OllamaEmbeddingsModel(TestsConfig.OLLAMA_EMBEDDING_MODEL)
         self.assertIsNotNone(embeddings.model)
-        mock_client.assert_called_once()
+        MockEmbeddings.assert_called_once()
 
-    @patch("raglight.embeddings.ollama_embeddings.Client")
-    def test_embed_documents(self, mock_client: MagicMock):
-        """Test batch embedding with .embed() method."""
-        mock_instance = mock_client.return_value
-        mock_instance.embed.return_value = {"embeddings": [[0.1, 0.2], [0.3, 0.4]]}
+    @patch("raglight.embeddings.ollama_embeddings.OllamaEmbeddings")
+    def test_embed_documents(self, MockEmbeddings: MagicMock):
+        mock_instance = MockEmbeddings.return_value
+        mock_instance.embed_documents.return_value = [[0.1, 0.2], [0.3, 0.4]]
 
         model = OllamaEmbeddingsModel(TestsConfig.OLLAMA_EMBEDDING_MODEL)
         texts = ["doc1", "doc2"]
         result = model.embed_documents(texts)
 
         self.assertEqual(len(result), 2)
-        mock_instance.embed.assert_called_with(
-            model=TestsConfig.OLLAMA_EMBEDDING_MODEL, input=texts, options=model.options
-        )
+        mock_instance.embed_documents.assert_called_with(texts)
 
-    @patch("raglight.embeddings.ollama_embeddings.Client")
-    def test_embed_query(self, mock_client: MagicMock):
-        """Test single embedding with .embeddings() method."""
-        mock_instance = mock_client.return_value
-        mock_instance.embeddings.return_value = {"embedding": [0.9, 0.9]}
+    @patch("raglight.embeddings.ollama_embeddings.OllamaEmbeddings")
+    def test_embed_query(self, MockEmbeddings: MagicMock):
+        mock_instance = MockEmbeddings.return_value
+        mock_instance.embed_query.return_value = [0.9, 0.9]
 
         model = OllamaEmbeddingsModel(TestsConfig.OLLAMA_EMBEDDING_MODEL)
-        text = "query text"
-        result = model.embed_query(text)
+        result = model.embed_query("query text")
 
         self.assertEqual(result, [0.9, 0.9])
-        mock_instance.embeddings.assert_called_with(
-            model=TestsConfig.OLLAMA_EMBEDDING_MODEL, prompt=text, options=model.options
-        )
+        mock_instance.embed_query.assert_called_with("query text")
 
 
 if __name__ == "__main__":
