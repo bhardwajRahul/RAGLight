@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, List, Dict, Optional
 import os
 import logging
@@ -10,14 +11,15 @@ from ..document_processing.document_processor import DocumentProcessor
 from ..document_processing.document_processor_factory import DocumentProcessorFactory
 from ..embeddings.embeddings_model import EmbeddingsModel
 from ..config.settings import Settings
+from .bm25_index import BM25Index
 
 
 class VectorStore(ABC):
     """
     Abstract base class for vector store implementations.
 
-    This class provides a shared ingestion pipeline and defines the abstract methods
-    that concrete implementations (like Chroma, Qdrant) must provide.
+    This class provides a shared ingestion pipeline, BM25/hybrid search logic,
+    and defines the abstract methods that concrete implementations must provide.
     """
 
     def __init__(
@@ -25,15 +27,115 @@ class VectorStore(ABC):
         persist_directory: str,
         embeddings_model: EmbeddingsModel,
         custom_processors: Optional[Dict[str, DocumentProcessor]] = None,
+        search_type: str = "semantic",
+        alpha: float = 0.5,
     ) -> None:
-        """
-        Initializes a VectorStore instance.
-        """
         self.embeddings_model: EmbeddingsModel = embeddings_model
         self.persist_directory: str = persist_directory
         self.vector_store: Any = None
         self.vector_store_classes: Any = None
         self.custom_processors: Dict[str, DocumentProcessor] = custom_processors or {}
+        self.search_type = search_type
+        self.alpha = alpha
+        self._bm25 = BM25Index()
+
+    # ------------------------------------------------------------------
+    # BM25 / hybrid helpers (shared across all backends)
+    # ------------------------------------------------------------------
+
+    def _bm25_path(self) -> Optional[Path]:
+        collection_name = getattr(self, "collection_name", None)
+        if not self.persist_directory or not collection_name:
+            return None
+        return Path(self.persist_directory) / f"bm25_{collection_name}.json"
+
+    def _update_bm25(self, documents: List[Document]) -> None:
+        texts = [doc.page_content for doc in documents]
+        self._bm25.add_documents(texts)
+        bm25_path = self._bm25_path()
+        if bm25_path:
+            self._bm25.save(bm25_path)
+
+    def _bm25_search(self, question: str, k: int) -> List[Document]:
+        results = self._bm25.search(question, k)
+        docs = []
+        for idx, _score in results:
+            if idx < len(self._bm25.corpus):
+                docs.append(Document(page_content=self._bm25.corpus[idx]))
+        return docs
+
+    def _rrf(self, ranked_lists: List[List[Document]], k_rrf: int = 60) -> List[Document]:
+        scores: Dict[str, float] = {}
+        doc_map: Dict[str, Document] = {}
+        for ranked in ranked_lists:
+            for rank, doc in enumerate(ranked):
+                key = doc.page_content[:100]
+                scores[key] = scores.get(key, 0) + 1 / (k_rrf + rank + 1)
+                doc_map[key] = doc
+        sorted_keys = sorted(scores, key=scores.__getitem__, reverse=True)
+        return [doc_map[k] for k in sorted_keys]
+
+    def _hybrid_search(
+        self, question: str, k: int, filter: Optional[Dict[str, Any]]
+    ) -> List[Document]:
+        fetch_k = k * 2
+        semantic_docs = self._semantic_search(question, fetch_k, filter)
+        bm25_docs = self._bm25_search(question, fetch_k)
+        return self._rrf([semantic_docs, bm25_docs])[:k]
+
+    # ------------------------------------------------------------------
+    # Abstract methods
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def _semantic_search(
+        self,
+        question: str,
+        k: int,
+        filter: Optional[Dict[str, Any]],
+        collection_name: Optional[str] = None,
+    ) -> List[Document]:
+        """Backend-specific dense vector search."""
+        pass
+
+    @abstractmethod
+    def add_documents(self, documents: List[Document]) -> None:
+        pass
+
+    @abstractmethod
+    def add_class_documents(self, documents: List[Document]) -> None:
+        pass
+
+    @abstractmethod
+    def similarity_search_class(
+        self, question: str, k: int = 5, filter: Dict[str, str] = None
+    ) -> List[Document]:
+        pass
+
+    @abstractmethod
+    def get_available_collections(self) -> List[str]:
+        pass
+
+    # ------------------------------------------------------------------
+    # Shared similarity_search with search_type routing
+    # ------------------------------------------------------------------
+
+    def similarity_search(
+        self,
+        question: str,
+        k: int = 5,
+        filter: Optional[Dict[str, str]] = None,
+        collection_name: Optional[str] = None,
+    ) -> List[Document]:
+        if self.search_type == "bm25":
+            return self._bm25_search(question, k)
+        elif self.search_type == "hybrid":
+            return self._hybrid_search(question, k, filter)
+        return self._semantic_search(question, k, filter, collection_name)
+
+    # ------------------------------------------------------------------
+    # Ingestion pipeline (shared)
+    # ------------------------------------------------------------------
 
     @staticmethod
     def _process_file(
@@ -54,12 +156,6 @@ class VectorStore(ABC):
             return [], []
 
     def ingest(self, data_path: str, ignore_folders: List[str] = None) -> None:
-        """
-        Orchestrates the ingestion of documents by recursively walking the data_path,
-        ignoring specified folders, and using a factory to select the correct
-        processing strategy for each file. This logic is shared across all
-        VectorStore implementations.
-        """
         if not os.path.isdir(data_path):
             logging.error(f"Provided data_path '{data_path}' is not a valid directory.")
             return
@@ -108,63 +204,13 @@ class VectorStore(ABC):
         logging.info("🎉 Ingestion process completed successfully!")
 
     def _flatten_metadata(self, documents: List[Document]) -> List[Document]:
-        """
-        Creates a deep copy of the documents and converts any complex metadata values
-        (lists, dicts) into their string representations.
-        """
         cloned_documents = copy.deepcopy(documents)
-
         for doc in cloned_documents:
             for key, value in doc.metadata.items():
                 if not isinstance(value, (str, int, float, bool)):
                     doc.metadata[key] = str(value)
         return cloned_documents
 
-    @abstractmethod
-    def add_documents(self, documents: List[Document]) -> None:
-        """
-        Adds a list of document chunks to the main vector store.
-        """
-        pass
-
-    @abstractmethod
-    def add_class_documents(self, documents: List[Document]) -> None:
-        """
-        Adds a list of class signature documents to the dedicated class vector store.
-        """
-        pass
-
-    @abstractmethod
-    def similarity_search(
-        self, question: str, k: int = 5, filter: Dict[str, str] = None
-    ) -> List[Document]:
-        """
-        Performs a similarity search in the main vector store.
-        """
-        pass
-
-    @abstractmethod
-    def similarity_search_class(
-        self, question: str, k: int = 5, filter: Dict[str, str] = None
-    ) -> List[Document]:
-        """
-        Performs a similarity search in the class vector store.
-        """
-        pass
-
     def _should_ignore(self, path: str, ignore_folders: List[str]) -> bool:
-        """
-        Checks if a given path should be ignored.
-        """
         normalized_path = os.path.normpath(path)
         return any(folder in normalized_path.split(os.sep) for folder in ignore_folders)
-
-    @abstractmethod
-    def get_available_collections(self) -> List[str]:
-        """
-        Retrieves the list of available collections in the vector store.
-
-        Returns:
-            List[str]: A list of collection names available for querying.
-        """
-        pass

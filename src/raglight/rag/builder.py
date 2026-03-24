@@ -138,8 +138,12 @@ class Builder:
         elif type == Settings.QDRANT:
             from ..vectorstore.qdrant import QdrantVS
 
+            search_type = kwargs.pop("search_type", Settings.SEARCH_HYBRID)
+            alpha = kwargs.pop("alpha", 0.5)
             self.vector_store = QdrantVS(
                 embeddings_model=self.embeddings,
+                search_type=search_type,
+                alpha=alpha,
                 **kwargs,
             )
         else:

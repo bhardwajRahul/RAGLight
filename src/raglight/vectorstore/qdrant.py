@@ -16,6 +16,7 @@ class QdrantVS(VectorStore):
     Concrete implementation for Qdrant using the qdrant-client library.
 
     Supports local (on-disk) and remote (HTTP) modes.
+    Supports search_type: "semantic" (default), "bm25", "hybrid".
     """
 
     def __init__(
@@ -26,6 +27,8 @@ class QdrantVS(VectorStore):
         custom_processors: Optional[Dict[str, DocumentProcessor]] = None,
         host: str = None,
         port: int = 6333,
+        search_type: str = "semantic",
+        alpha: float = 0.5,
     ) -> None:
         try:
             from qdrant_client import QdrantClient
@@ -36,7 +39,7 @@ class QdrantVS(VectorStore):
                 "Install it with: pip install raglight[qdrant]"
             )
 
-        super().__init__(persist_directory, embeddings_model, custom_processors)
+        super().__init__(persist_directory, embeddings_model, custom_processors, search_type, alpha)
 
         self.collection_name = collection_name
         self._classes_collection_name = f"{collection_name}_classes"
@@ -56,6 +59,27 @@ class QdrantVS(VectorStore):
 
         self._ensure_collection(self.collection_name)
         self._ensure_collection(self._classes_collection_name)
+
+        bm25_path = self._bm25_path()
+        if bm25_path and bm25_path.exists():
+            self._bm25.load(bm25_path)
+        elif search_type in ("bm25", "hybrid"):
+            self._rebuild_bm25_from_qdrant()
+
+    def _rebuild_bm25_from_qdrant(self) -> None:
+        try:
+            records, _ = self.client.scroll(
+                collection_name=self.collection_name, limit=10_000, with_payload=True
+            )
+            texts = [
+                r.payload.get("page_content", "")
+                for r in records
+                if r.payload and r.payload.get("page_content")
+            ]
+            if texts:
+                self._bm25.add_documents(texts)
+        except Exception as e:
+            logging.warning(f"Could not rebuild BM25 from Qdrant: {e}")
 
     def _ensure_collection(self, name: str) -> None:
         from qdrant_client.models import Distance, VectorParams
@@ -89,15 +113,17 @@ class QdrantVS(VectorStore):
         ]
         self.client.upsert(collection_name=collection_name, points=points)
 
-    def _search_collection(
+    @override
+    def _semantic_search(
         self,
-        collection_name: str,
         question: str,
         k: int,
         filter: Optional[Dict[str, Any]],
+        collection_name: Optional[str] = None,
     ) -> List[Document]:
         from qdrant_client.models import Filter, FieldCondition, MatchValue
 
+        target = collection_name or self.collection_name
         query_vector = self.embeddings_model.embed_query(question)
 
         qdrant_filter = None
@@ -110,7 +136,7 @@ class QdrantVS(VectorStore):
             )
 
         results = self.client.query_points(
-            collection_name=collection_name,
+            collection_name=target,
             query=query_vector,
             limit=k,
             query_filter=qdrant_filter,
@@ -131,6 +157,7 @@ class QdrantVS(VectorStore):
             f"⏳ Adding {len(documents)} document chunks to Qdrant collection '{self.collection_name}'..."
         )
         self._add_to_collection(self.collection_name, documents)
+        self._update_bm25(documents)
         logging.info("✅ Documents successfully added.")
 
     @override
@@ -144,17 +171,6 @@ class QdrantVS(VectorStore):
         logging.info("✅ Class documents successfully added.")
 
     @override
-    def similarity_search(
-        self,
-        question: str,
-        k: int = 5,
-        filter: Optional[Dict[str, str]] = None,
-        collection_name: Optional[str] = None,
-    ) -> List[Document]:
-        target = collection_name or self.collection_name
-        return self._search_collection(target, question, k, filter)
-
-    @override
     def similarity_search_class(
         self,
         question: str,
@@ -166,7 +182,7 @@ class QdrantVS(VectorStore):
             target = f"{collection_name}_classes"
         else:
             target = self._classes_collection_name
-        return self._search_collection(target, question, k, filter)
+        return self._semantic_search(question, k, filter, target)
 
     @override
     def get_available_collections(self) -> List[str]:
