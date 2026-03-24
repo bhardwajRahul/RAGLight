@@ -37,8 +37,9 @@ class TestServerConfigDefaults(unittest.TestCase):
             "RAGLIGHT_PERSIST_DIR": "/tmp/mydb",
             "RAGLIGHT_COLLECTION": "myproject",
             "RAGLIGHT_K": "10",
-            "RAGLIGHT_CHROMA_HOST": "chromadb",
-            "RAGLIGHT_CHROMA_PORT": "8001",
+            "RAGLIGHT_DB": "chromadb",
+            "RAGLIGHT_DB_PORT": "8001",
+            "RAGLIGHT_DB_HOST": "localhost",
         }
         with patch.dict(os.environ, {**_clean_env(), **env}, clear=True):
             cfg = ServerConfig()
@@ -51,8 +52,9 @@ class TestServerConfigDefaults(unittest.TestCase):
         self.assertEqual(cfg.persist_dir, "/tmp/mydb")
         self.assertEqual(cfg.collection, "myproject")
         self.assertEqual(cfg.k, 10)
-        self.assertEqual(cfg.chroma_host, "chromadb")
-        self.assertEqual(cfg.chroma_port, 8001)
+        self.assertEqual(cfg.db_host, "localhost")
+        self.assertEqual(cfg.db_port, 8001)
+        self.assertEqual(cfg.db, "chroma")
 
     def test_to_rag_config_returns_correct_type(self):
         with patch.dict(os.environ, _clean_env(), clear=True):
