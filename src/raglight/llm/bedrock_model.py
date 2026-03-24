@@ -93,7 +93,9 @@ class BedrockModel(LLM):
         return response.content
 
     @override
-    def generate_streaming(self, input: Dict[str, Any], callbacks=None) -> Iterable[str]:
+    def generate_streaming(
+        self, input: Dict[str, Any], callbacks=None
+    ) -> Iterable[str]:
         history = input.get("history", [])
         messages = []
 

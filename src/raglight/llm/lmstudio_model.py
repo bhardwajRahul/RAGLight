@@ -45,7 +45,14 @@ class LMStudioModel(LLM):
         if "images" in input:
             content = [{"type": "text", "text": question}]
             for image in input["images"]:
-                content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image['base64']}"}})
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image['base64']}"
+                        },
+                    }
+                )
             messages.append(HumanMessage(content=content))
         else:
             messages.append(HumanMessage(content=question))
@@ -57,7 +64,9 @@ class LMStudioModel(LLM):
         return response.content
 
     @override
-    def generate_streaming(self, input: Dict[str, Any], callbacks=None) -> Iterable[str]:
+    def generate_streaming(
+        self, input: Dict[str, Any], callbacks=None
+    ) -> Iterable[str]:
         config = {"callbacks": callbacks} if callbacks else {}
         for chunk in self.model.stream(self._build_messages(input), config=config):
             if chunk.content:

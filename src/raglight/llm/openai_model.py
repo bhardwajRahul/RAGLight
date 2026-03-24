@@ -46,7 +46,14 @@ class OpenAIModel(LLM):
             content = [{"type": "text", "text": question}]
             for image in input["images"]:
                 try:
-                    content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image['base64']}"}})
+                    content.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image['base64']}"
+                            },
+                        }
+                    )
                 except Exception as e:
                     logging.error(f"Could not read image: {e}")
             messages.append(HumanMessage(content=content))
@@ -60,7 +67,9 @@ class OpenAIModel(LLM):
         return response.content
 
     @override
-    def generate_streaming(self, input: Dict[str, Any], callbacks=None) -> Iterable[str]:
+    def generate_streaming(
+        self, input: Dict[str, Any], callbacks=None
+    ) -> Iterable[str]:
         config = {"callbacks": callbacks} if callbacks else {}
         for chunk in self.model.stream(self._build_messages(input), config=config):
             if chunk.content:

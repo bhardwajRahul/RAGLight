@@ -62,8 +62,14 @@ class OllamaModel(LLM):
         if "images" in input:
             content = [{"type": "text", "text": question}]
             for img in input["images"]:
-                b64 = base64.b64encode(img["bytes"]).decode() if isinstance(img.get("bytes"), bytes) else img.get("base64", "")
-                content.append({"type": "image_url", "image_url": f"data:image/jpeg;base64,{b64}"})
+                b64 = (
+                    base64.b64encode(img["bytes"]).decode()
+                    if isinstance(img.get("bytes"), bytes)
+                    else img.get("base64", "")
+                )
+                content.append(
+                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{b64}"}
+                )
             messages.append(HumanMessage(content=content))
         else:
             messages.append(HumanMessage(content=question))
@@ -75,7 +81,9 @@ class OllamaModel(LLM):
         return response.content
 
     @override
-    def generate_streaming(self, input: Dict[str, Any], callbacks=None) -> Iterable[str]:
+    def generate_streaming(
+        self, input: Dict[str, Any], callbacks=None
+    ) -> Iterable[str]:
         config = {"callbacks": callbacks} if callbacks else {}
         for chunk in self.model.stream(self._build_messages(input), config=config):
             if chunk.content:

@@ -178,6 +178,14 @@ def callback():
     """
     Settings.setup_logging()
     os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+
+    _langfuse_configured = all([
+        os.environ.get("LANGFUSE_PUBLIC_KEY"),
+        os.environ.get("LANGFUSE_SECRET_KEY"),
+        os.environ.get("LANGFUSE_HOST") or os.environ.get("LANGFUSE_BASE_URL"),
+    ])
+    if not _langfuse_configured:
+        os.environ.setdefault("LANGFUSE_TRACING_ENABLED", "false")
     for name in [
         "telemetry",
         "langchain",

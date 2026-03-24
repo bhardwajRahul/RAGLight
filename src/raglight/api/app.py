@@ -4,6 +4,17 @@ import os
 # Disable ChromaDB telemetry before chromadb is imported
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 
+# Disable Langfuse OTLP auto-instrumentation when not configured.
+# Langfuse v4 auto-initializes its OpenTelemetry exporter on import and tries
+# to reach localhost:3000 by default even without explicit credentials.
+_langfuse_configured = all([
+    os.environ.get("LANGFUSE_PUBLIC_KEY"),
+    os.environ.get("LANGFUSE_SECRET_KEY"),
+    os.environ.get("LANGFUSE_HOST") or os.environ.get("LANGFUSE_BASE_URL"),
+])
+if not _langfuse_configured:
+    os.environ.setdefault("LANGFUSE_TRACING_ENABLED", "false")
+
 from pathlib import Path
 from dotenv import load_dotenv
 
