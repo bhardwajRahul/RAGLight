@@ -3,130 +3,64 @@ from typing import Iterable, Optional, Dict, Any
 from typing_extensions import override
 from ..config.settings import Settings
 from .llm import LLM
-from mistralai import Mistral
 import logging
+
+from langchain_mistralai import ChatMistralAI
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 
 class MistralModel(LLM):
-    """
-    Implementation of the LLM abstract base class for the Mistral model.
-
-    This class provides methods for initializing, loading, and interacting with the Mistral model.
-    It includes support for custom system prompts and user roles.
-
-    Attributes:
-        model_name (str): The name of the Mistral model.
-        role (str): The role of the user in the chat (default is 'user').
-        system_prompt (str): The system prompt to guide the model's behavior.
-    """
-
     def __init__(
         self,
         model_name: str,
         system_prompt: Optional[str] = None,
         system_prompt_file: Optional[str] = None,
-        # no api_base
         api_base: str = None,
         role: str = "user",
     ) -> None:
-        """
-        Initializes an MistralModel instance.
-
-        Args:
-            model_name (str): The name of the Mistral model to be loaded.
-            system_prompt (Optional[str]): System prompt. Defaults to None.
-            system_prompt_file (Optional[str]): Path to a file containing a custom system prompt. Defaults to None.
-            role (str): The role of the user in the chat (e.g., 'user', 'assistant'). Defaults to 'user'.
-        """
         self.api_key = Settings.MISTRAL_API_KEY
         super().__init__(model_name, system_prompt, system_prompt_file)
         logging.info(f"Using Mistral with {model_name} model 🤖")
         self.role: str = role
 
     @override
-    def load(self) -> Mistral:
-        """
-        Loads the Mistral model client.
+    def load(self) -> ChatMistralAI:
+        return ChatMistralAI(
+            model=self.model_name,
+            api_key=self.api_key,
+        )
 
-        Returns:
-            Client: An instance of the Mistral model client, configured with the necessary host and headers.
-        """
-        return Mistral(api_key=self.api_key)
+    def _build_messages(self, input: Dict[str, Any]):
+        messages = []
+        if self.system_prompt:
+            messages.append(SystemMessage(content=self.system_prompt))
+        for msg in input.get("history", []):
+            if msg["role"] == "assistant":
+                messages.append(AIMessage(content=msg["content"]))
+            else:
+                messages.append(HumanMessage(content=msg["content"]))
+
+        question = input.get("question", "")
+        if "images" in input:
+            content = [{"type": "text", "text": question}]
+            for image in input["images"]:
+                try:
+                    content.append({"type": "image_url", "image_url": f"data:image/jpeg;base64,{image['base64']}"})
+                except Exception as e:
+                    logging.error(f"Could not read image: {e}")
+            messages.append(HumanMessage(content=content))
+        else:
+            messages.append(HumanMessage(content=question))
+        return messages
 
     @override
     def generate(self, input: Dict[str, Any]) -> str:
-        """
-        Generates text using the Mistral model.
-
-        Args:
-            input (Dict[str, Any]): A dictionary containing the input data for text generation. The structure should
-                                    include the necessary keys for the Mistral API.
-
-        Returns:
-            str: The generated output from the model.
-        """
-        history = input.get("history", [])
-        messages = []
-
-        if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-
-        for msg in history:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-
-        content_blocks = [{"type": "text", "text": input.get("question", "")}]
-
-        if "images" in input:
-            for image in input["images"]:
-                try:
-                    content_blocks.append(
-                        {
-                            "type": "image_url",
-                            "image_url": f"data:image/jpeg;base64,{image['base64']}",
-                        }
-                    )
-                except Exception as e:
-                    logging.error(f"Could not read image: {e}")
-
-        messages.append({"role": self.role, "content": content_blocks})
-        response = self.model.chat.complete(
-            model=self.model_name,
-            messages=messages,
-        )
-        return response.choices[0].message.content
+        response = self.model.invoke(self._build_messages(input))
+        return response.content
 
     @override
-    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
-        history = input.get("history", [])
-        messages = []
-
-        if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-
-        for msg in history:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-
-        content_blocks = [{"type": "text", "text": input.get("question", "")}]
-
-        if "images" in input:
-            for image in input["images"]:
-                try:
-                    content_blocks.append(
-                        {
-                            "type": "image_url",
-                            "image_url": f"data:image/jpeg;base64,{image['base64']}",
-                        }
-                    )
-                except Exception as e:
-                    logging.error(f"Could not read image: {e}")
-
-        messages.append({"role": self.role, "content": content_blocks})
-
-        with self.model.chat.stream(
-            model=self.model_name,
-            messages=messages,
-        ) as stream:
-            for event in stream:
-                delta = event.data.choices[0].delta.content
-                if delta:
-                    yield delta
+    def generate_streaming(self, input: Dict[str, Any], callbacks=None) -> Iterable[str]:
+        config = {"callbacks": callbacks} if callbacks else {}
+        for chunk in self.model.stream(self._build_messages(input), config=config):
+            if chunk.content:
+                yield chunk.content

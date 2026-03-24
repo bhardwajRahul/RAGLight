@@ -76,12 +76,15 @@ class LLM(ABC):
         pass
 
     @abstractmethod
-    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
+    def generate_streaming(
+        self, input: Dict[str, Any], callbacks: Optional[list] = None
+    ) -> Iterable[str]:
         """
         Abstract method to generate text in streaming mode.
 
         Args:
             input (Dict[str, Any]): A dictionary containing the input data for text generation.
+            callbacks (Optional[list]): Optional list of LangChain callbacks (e.g. Langfuse).
 
         Yields:
             str: Successive chunks of the generated output.

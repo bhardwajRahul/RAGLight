@@ -302,9 +302,11 @@ class RAG:
 
         prompt = self._build_prompt(state)
 
+        callbacks = [self._build_langfuse_callback()] if self.langfuse_config else None
+
         full_answer = ""
         for chunk in self.llm.generate_streaming(
-            {"question": prompt, "history": state["history"]}
+            {"question": prompt, "history": state["history"]}, callbacks=callbacks
         ):
             full_answer += chunk
             yield chunk
