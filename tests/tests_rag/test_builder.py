@@ -8,7 +8,7 @@ logging.getLogger().setLevel(logging.WARNING)
 
 
 class TestRAGBuilder(unittest.TestCase):
-    @patch("raglight.rag.builder.ChromaVS")
+    @patch("raglight.vectorstore.chroma.ChromaVS")
     def test_builder_rag(self, mock_chroma):
         mock_chroma_instance = MagicMock()
         mock_chroma.return_value = mock_chroma_instance

@@ -23,8 +23,8 @@ class TestServerConfigDefaults(unittest.TestCase):
         self.assertEqual(cfg.embeddings_provider, Settings.HUGGINGFACE)
         self.assertEqual(cfg.collection, "default")
         self.assertEqual(cfg.k, Settings.DEFAULT_K)
-        self.assertIsNone(cfg.chroma_host)
-        self.assertIsNone(cfg.chroma_port)
+        self.assertIsNone(cfg.db_host)
+        self.assertIsNone(cfg.db_port)
 
     def test_env_override(self):
         env = {
@@ -37,8 +37,9 @@ class TestServerConfigDefaults(unittest.TestCase):
             "RAGLIGHT_PERSIST_DIR": "/tmp/mydb",
             "RAGLIGHT_COLLECTION": "myproject",
             "RAGLIGHT_K": "10",
-            "RAGLIGHT_CHROMA_HOST": "chromadb",
-            "RAGLIGHT_CHROMA_PORT": "8001",
+            "RAGLIGHT_DB": "chromadb",
+            "RAGLIGHT_DB_PORT": "8001",
+            "RAGLIGHT_DB_HOST": "localhost",
         }
         with patch.dict(os.environ, {**_clean_env(), **env}, clear=True):
             cfg = ServerConfig()
@@ -51,8 +52,9 @@ class TestServerConfigDefaults(unittest.TestCase):
         self.assertEqual(cfg.persist_dir, "/tmp/mydb")
         self.assertEqual(cfg.collection, "myproject")
         self.assertEqual(cfg.k, 10)
-        self.assertEqual(cfg.chroma_host, "chromadb")
-        self.assertEqual(cfg.chroma_port, 8001)
+        self.assertEqual(cfg.db_host, "localhost")
+        self.assertEqual(cfg.db_port, 8001)
+        self.assertEqual(cfg.db, "chromadb")
 
     def test_to_rag_config_returns_correct_type(self):
         with patch.dict(os.environ, _clean_env(), clear=True):
@@ -74,7 +76,11 @@ class TestServerConfigDefaults(unittest.TestCase):
         self.assertEqual(vs_config.collection_name, cfg.collection)
 
     def test_to_vector_store_config_chroma_host(self):
-        env = {**_clean_env(), "RAGLIGHT_CHROMA_HOST": "chromadb", "RAGLIGHT_CHROMA_PORT": "8000"}
+        env = {
+            **_clean_env(),
+            "RAGLIGHT_DB_HOST": "chromadb",
+            "RAGLIGHT_DB_PORT": "8000",
+        }
         with patch.dict(os.environ, env, clear=True):
             cfg = ServerConfig()
         vs_config = cfg.to_vector_store_config()

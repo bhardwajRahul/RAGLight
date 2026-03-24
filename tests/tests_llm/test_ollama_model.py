@@ -84,7 +84,11 @@ class TestOllamaModelStreaming(unittest.TestCase):
             {"role": "user", "content": "Previous question"},
             {"role": "assistant", "content": "Previous answer"},
         ]
-        list(self.model.generate_streaming({"question": "Follow-up.", "history": history}))
+        list(
+            self.model.generate_streaming(
+                {"question": "Follow-up.", "history": history}
+            )
+        )
         call_kwargs = self.mock_client.chat.call_args.kwargs
         messages = call_kwargs["messages"]
         # system + 2 history + user question = 4

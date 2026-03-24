@@ -13,7 +13,6 @@ from ..llm.lmstudio_model import LMStudioModel
 from ..llm.mistral_model import MistralModel
 from ..llm.openai_model import OpenAIModel
 from ..vectorstore.vector_store import VectorStore
-from ..vectorstore.chroma import ChromaVS
 from ..config.settings import Settings
 from .rag import RAG
 from ..embeddings.embeddings_model import EmbeddingsModel
@@ -121,12 +120,26 @@ class Builder:
                 "You need to set an embedding model before setting a vector store"
             )
         elif type == Settings.CHROMA:
+            try:
+                from ..vectorstore.chroma import ChromaVS
+            except ImportError:
+                raise ImportError(
+                    "chromadb is required to use ChromaVS. "
+                    "Install it with: pip install raglight[chroma]"
+                )
             search_type = kwargs.pop("search_type", Settings.SEARCH_HYBRID)
             alpha = kwargs.pop("alpha", 0.5)
             self.vector_store = ChromaVS(
                 embeddings_model=self.embeddings,
                 search_type=search_type,
                 alpha=alpha,
+                **kwargs,
+            )
+        elif type == Settings.QDRANT:
+            from ..vectorstore.qdrant import QdrantVS
+
+            self.vector_store = QdrantVS(
+                embeddings_model=self.embeddings,
                 **kwargs,
             )
         else:

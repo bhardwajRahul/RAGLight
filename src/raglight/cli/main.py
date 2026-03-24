@@ -208,18 +208,38 @@ def interactive_chat_command():
     cfg = ServerConfig()
 
     _raglight_env_vars = [
-        "RAGLIGHT_LLM_MODEL", "RAGLIGHT_LLM_PROVIDER", "RAGLIGHT_EMBEDDINGS_MODEL",
-        "RAGLIGHT_EMBEDDINGS_PROVIDER", "RAGLIGHT_PERSIST_DIR", "RAGLIGHT_COLLECTION",
+        "RAGLIGHT_LLM_MODEL",
+        "RAGLIGHT_LLM_PROVIDER",
+        "RAGLIGHT_EMBEDDINGS_MODEL",
+        "RAGLIGHT_EMBEDDINGS_PROVIDER",
+        "RAGLIGHT_PERSIST_DIR",
+        "RAGLIGHT_COLLECTION",
     ]
     headless = any(os.environ.get(v) for v in _raglight_env_vars)
 
-    emb_choices = [Settings.HUGGINGFACE, Settings.OLLAMA, Settings.OPENAI, Settings.GOOGLE_GEMINI]
-    llm_choices = [Settings.OLLAMA, Settings.MISTRAL, Settings.OPENAI, Settings.LMSTUDIO, Settings.GOOGLE_GEMINI]
+    emb_choices = [
+        Settings.HUGGINGFACE,
+        Settings.OLLAMA,
+        Settings.OPENAI,
+        Settings.GOOGLE_GEMINI,
+    ]
+    llm_choices = [
+        Settings.OLLAMA,
+        Settings.MISTRAL,
+        Settings.OPENAI,
+        Settings.LMSTUDIO,
+        Settings.GOOGLE_GEMINI,
+    ]
     k_choices = ["5", "10", "15"]
+
+    db_choices = [Settings.CHROMA, Settings.QDRANT]
 
     # ── Step 1: Model / DB config ──────────────────────────────────────────────
     if headless:
+        db_type = cfg.db
         db_path = cfg.persist_dir
+        db_host = cfg.db_host
+        db_port = cfg.db_port
         collection = cfg.collection
         emb_provider = cfg.embeddings_provider
         embeddings_base_url = cfg.embeddings_api_base
@@ -230,9 +250,17 @@ def interactive_chat_command():
         k = cfg.k
 
         console.print("[bold magenta]🚀 RAGLight Chat[/bold magenta]")
-        console.print(f"  LLM          : [cyan]{llm_provider}[/cyan] / [cyan]{llm_model}[/cyan]")
-        console.print(f"  Embeddings   : [cyan]{emb_provider}[/cyan] / [cyan]{emb_model}[/cyan]")
-        console.print(f"  Persist dir  : [cyan]{db_path}[/cyan]")
+        console.print(
+            f"  LLM          : [cyan]{llm_provider}[/cyan] / [cyan]{llm_model}[/cyan]"
+        )
+        console.print(
+            f"  Embeddings   : [cyan]{emb_provider}[/cyan] / [cyan]{emb_model}[/cyan]"
+        )
+        console.print(f"  Vector store : [cyan]{db_type}[/cyan]")
+        if db_host:
+            console.print(f"  DB host      : [cyan]{db_host}:{db_port}[/cyan]")
+        else:
+            console.print(f"  Persist dir  : [cyan]{db_path}[/cyan]")
         console.print(f"  Collection   : [cyan]{collection}[/cyan]")
         console.print(f"  k            : [cyan]{k}[/cyan]")
     else:
@@ -247,10 +275,17 @@ def interactive_chat_command():
         )
 
         console.print("[bold cyan]\n--- 💾 Step 1: Vector Database ---[/bold cyan]")
+        db_type = simple_select(
+            "Which vector store do you want to use?",
+            choices=db_choices,
+            default=_safe_default(db_choices, cfg.db),
+        )
         db_path = typer.prompt(
             "Where should the vector database be stored?",
             default=cfg.persist_dir,
         )
+        db_host = None
+        db_port = None
         collection = typer.prompt(
             "What is the name for the database collection?",
             default=cfg.collection,
@@ -271,7 +306,9 @@ def interactive_chat_command():
             default=cfg.embeddings_model,
         )
 
-        console.print("[bold blue]\n--- 🤖 Step 3: Language Model (LLM) ---[/bold blue]")
+        console.print(
+            "[bold blue]\n--- 🤖 Step 3: Language Model (LLM) ---[/bold blue]"
+        )
         llm_provider = simple_select(
             "Which LLM provider do you want to use?",
             choices=llm_choices,
@@ -285,18 +322,22 @@ def interactive_chat_command():
             "[bold]Which LLM do you want to use?[/bold]",
             default=cfg.llm_model,
         )
-        k = int(simple_select(
-            "How many documents should be retrieved for context (k)?",
-            choices=k_choices,
-            default=_safe_default(k_choices, str(cfg.k)),
-        ))
+        k = int(
+            simple_select(
+                "How many documents should be retrieved for context (k)?",
+                choices=k_choices,
+                default=_safe_default(k_choices, str(cfg.k)),
+            )
+        )
 
     # ── Step 2: Knowledge base ─────────────────────────────────────────────────
     env_data_path = os.environ.get("RAGLIGHT_DATA_PATH")
     if env_data_path:
         data_path = Path(env_data_path)
         if not data_path.is_dir():
-            console.print(f"[bold red]❌ RAGLIGHT_DATA_PATH '{env_data_path}' is not a valid directory.[/bold red]")
+            console.print(
+                f"[bold red]❌ RAGLIGHT_DATA_PATH '{env_data_path}' is not a valid directory.[/bold red]"
+            )
             raise typer.Exit(code=1)
         github_sources = []
         ignore_folders = Settings.DEFAULT_IGNORE_FOLDERS.copy()
@@ -317,15 +358,19 @@ def interactive_chat_command():
             ):
                 should_index = False
 
+        vs_kwargs = {"collection_name": collection}
+        if db_host:
+            vs_kwargs["host"] = db_host
+            if db_port:
+                vs_kwargs["port"] = db_port
+        else:
+            vs_kwargs["persist_directory"] = db_path
+
         builder = Builder()
         builder.with_embeddings(
             emb_provider, model_name=emb_model, api_base=embeddings_base_url
         )
-        builder.with_vector_store(
-            Settings.CHROMA,
-            persist_directory=db_path,
-            collection_name=collection,
-        )
+        builder.with_vector_store(db_type, **vs_kwargs)
 
         if should_index:
             vector_store = builder.build_vector_store()
@@ -405,18 +450,38 @@ def interactive_agentic_chat_command():
     cfg = ServerConfig()
 
     _raglight_env_vars = [
-        "RAGLIGHT_LLM_MODEL", "RAGLIGHT_LLM_PROVIDER", "RAGLIGHT_EMBEDDINGS_MODEL",
-        "RAGLIGHT_EMBEDDINGS_PROVIDER", "RAGLIGHT_PERSIST_DIR", "RAGLIGHT_COLLECTION",
+        "RAGLIGHT_LLM_MODEL",
+        "RAGLIGHT_LLM_PROVIDER",
+        "RAGLIGHT_EMBEDDINGS_MODEL",
+        "RAGLIGHT_EMBEDDINGS_PROVIDER",
+        "RAGLIGHT_PERSIST_DIR",
+        "RAGLIGHT_COLLECTION",
     ]
     headless = any(os.environ.get(v) for v in _raglight_env_vars)
 
-    emb_choices = [Settings.HUGGINGFACE, Settings.OLLAMA, Settings.OPENAI, Settings.GOOGLE_GEMINI]
-    llm_choices = [Settings.OLLAMA, Settings.MISTRAL, Settings.OPENAI, Settings.LMSTUDIO, Settings.GOOGLE_GEMINI]
+    emb_choices = [
+        Settings.HUGGINGFACE,
+        Settings.OLLAMA,
+        Settings.OPENAI,
+        Settings.GOOGLE_GEMINI,
+    ]
+    llm_choices = [
+        Settings.OLLAMA,
+        Settings.MISTRAL,
+        Settings.OPENAI,
+        Settings.LMSTUDIO,
+        Settings.GOOGLE_GEMINI,
+    ]
     k_choices = ["5", "10", "15"]
+
+    db_choices = [Settings.CHROMA, Settings.QDRANT]
 
     # ── Step 1: Model / DB config ──────────────────────────────────────────────
     if headless:
+        db_type = cfg.db
         db_path = cfg.persist_dir
+        db_host = cfg.db_host
+        db_port = cfg.db_port
         collection = cfg.collection
         emb_provider = cfg.embeddings_provider
         embeddings_base_url = cfg.embeddings_api_base
@@ -427,9 +492,17 @@ def interactive_agentic_chat_command():
         k = cfg.k
 
         console.print("[bold magenta]🚀 RAGLight Agentic Chat[/bold magenta]")
-        console.print(f"  LLM          : [cyan]{llm_provider}[/cyan] / [cyan]{llm_model}[/cyan]")
-        console.print(f"  Embeddings   : [cyan]{emb_provider}[/cyan] / [cyan]{emb_model}[/cyan]")
-        console.print(f"  Persist dir  : [cyan]{db_path}[/cyan]")
+        console.print(
+            f"  LLM          : [cyan]{llm_provider}[/cyan] / [cyan]{llm_model}[/cyan]"
+        )
+        console.print(
+            f"  Embeddings   : [cyan]{emb_provider}[/cyan] / [cyan]{emb_model}[/cyan]"
+        )
+        console.print(f"  Vector store : [cyan]{db_type}[/cyan]")
+        if db_host:
+            console.print(f"  DB host      : [cyan]{db_host}:{db_port}[/cyan]")
+        else:
+            console.print(f"  Persist dir  : [cyan]{db_path}[/cyan]")
         console.print(f"  Collection   : [cyan]{collection}[/cyan]")
         console.print(f"  k            : [cyan]{k}[/cyan]")
     else:
@@ -444,10 +517,17 @@ def interactive_agentic_chat_command():
         )
 
         console.print("[bold cyan]\n--- 💾 Step 1: Vector Database ---[/bold cyan]")
+        db_type = simple_select(
+            "Which vector store do you want to use?",
+            choices=db_choices,
+            default=_safe_default(db_choices, cfg.db),
+        )
         db_path = typer.prompt(
             "Where should the vector database be stored?",
             default=cfg.persist_dir,
         )
+        db_host = None
+        db_port = None
         collection = typer.prompt(
             "What is the name for the database collection?",
             default=cfg.collection,
@@ -468,7 +548,9 @@ def interactive_agentic_chat_command():
             default=cfg.embeddings_model,
         )
 
-        console.print("[bold blue]\n--- 🤖 Step 3: Language Model (LLM) ---[/bold blue]")
+        console.print(
+            "[bold blue]\n--- 🤖 Step 3: Language Model (LLM) ---[/bold blue]"
+        )
         llm_provider = simple_select(
             "Which LLM provider do you want to use?",
             choices=llm_choices,
@@ -482,18 +564,22 @@ def interactive_agentic_chat_command():
             "[bold]Which LLM do you want to use?[/bold]",
             default=cfg.llm_model,
         )
-        k = int(simple_select(
-            "How many documents should be retrieved for context (k)?",
-            choices=k_choices,
-            default=_safe_default(k_choices, str(cfg.k)),
-        ))
+        k = int(
+            simple_select(
+                "How many documents should be retrieved for context (k)?",
+                choices=k_choices,
+                default=_safe_default(k_choices, str(cfg.k)),
+            )
+        )
 
     # ── Step 2: Knowledge base ─────────────────────────────────────────────────
     env_data_path = os.environ.get("RAGLIGHT_DATA_PATH")
     if env_data_path:
         data_path = Path(env_data_path)
         if not data_path.is_dir():
-            console.print(f"[bold red]❌ RAGLIGHT_DATA_PATH '{env_data_path}' is not a valid directory.[/bold red]")
+            console.print(
+                f"[bold red]❌ RAGLIGHT_DATA_PATH '{env_data_path}' is not a valid directory.[/bold red]"
+            )
             raise typer.Exit(code=1)
         github_sources = []
         ignore_folders = Settings.DEFAULT_IGNORE_FOLDERS.copy()
@@ -524,8 +610,10 @@ def interactive_agentic_chat_command():
         vector_store_config = VectorStoreConfig(
             embedding_model=emb_model,
             api_base=embeddings_base_url,
-            database=Settings.CHROMA,
-            persist_directory=db_path,
+            database=db_type,
+            persist_directory=db_path if not db_host else None,
+            host=db_host,
+            port=db_port,
             provider=emb_provider,
             collection_name=collection,
         )
@@ -625,13 +713,15 @@ def serve_command(
     console.print(
         f"  Embeddings   : [cyan]{config.embeddings_provider}[/cyan] / [cyan]{config.embeddings_model}[/cyan]"
     )
-    console.print(f"  Persist dir  : [cyan]{config.persist_dir}[/cyan]")
+    console.print(f"  Vector store : [cyan]{config.db}[/cyan]")
+    if config.db_host:
+        console.print(
+            f"  DB host      : [cyan]{config.db_host}:{config.db_port}[/cyan]"
+        )
+    else:
+        console.print(f"  Persist dir  : [cyan]{config.persist_dir}[/cyan]")
     console.print(f"  Collection   : [cyan]{config.collection}[/cyan]")
     console.print(f"  k            : [cyan]{config.k}[/cyan]")
-    if config.chroma_host:
-        console.print(
-            f"  Chroma       : [cyan]{config.chroma_host}:{config.chroma_port}[/cyan]"
-        )
     if config.langfuse_host:
         if config.langfuse_public_key and config.langfuse_secret_key:
             console.print(f"  Langfuse     : [cyan]{config.langfuse_host}[/cyan]")

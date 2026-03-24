@@ -69,7 +69,9 @@ class TestRAGGenerateStreaming(unittest.TestCase):
     def setUp(self):
         self.llm = MagicMock()
         self.llm.generate.return_value = "unused"
-        self.llm.generate_streaming.return_value = iter(["RAGLight", " is", " a library."])
+        self.llm.generate_streaming.return_value = iter(
+            ["RAGLight", " is", " a library."]
+        )
         self.rag = _make_rag(llm=self.llm)
 
     def test_generate_streaming_yields_chunks(self):
