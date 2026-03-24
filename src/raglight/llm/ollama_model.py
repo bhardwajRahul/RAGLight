@@ -1,30 +1,19 @@
 from __future__ import annotations
+import base64
 from typing import Iterable, Mapping, Optional, Dict, Any
 from typing_extensions import override
 from ..config.settings import Settings
 from .llm import LLM
-from ollama import Client
 import logging
 
-# https://docs.ollama.com/context-length
+from langchain_ollama import ChatOllama
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
 OLLAMA_DEFAULT_CONTEXT_SIZE = 4096
 OLLAMA_OPTION_CONTEXT_SIZE = "num_ctx"
-OLLAMA_WARNING_CONTEXT_SIZE = 0.80
 
 
 class OllamaModel(LLM):
-    """
-    Implementation of the LLM abstract base class for the Ollama model.
-
-    This class provides methods for initializing, loading, and interacting with the Ollama model.
-    It includes support for custom system prompts and user roles.
-
-    Attributes:
-        model_name (str): The name of the Ollama model.
-        role (str): The role of the user in the chat (default is 'user').
-        system_prompt (str): The system prompt to guide the model's behavior.
-    """
-
     def __init__(
         self,
         model_name: str,
@@ -36,121 +25,58 @@ class OllamaModel(LLM):
         role: str = "user",
         headers: Optional[Mapping[str, str]] = None,
     ) -> None:
-        """
-        Initializes an OllamaModel instance.
-
-        Args:
-            model_name (str): The name of the Ollama model to be loaded.
-            options (Optional[Dict]): Ollama options, both load and runtime, see https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter
-            system_prompt (Optional[str]): System prompt. Defaults to None.
-            system_prompt_file (Optional[str]): Path to a file containing a custom system prompt. Defaults to None.
-            role (str): The role of the user in the chat (e.g., 'user', 'assistant'). Defaults to 'user'.
-            headers (Optional[Dict[str, str]]): Headers to be sent with the request. Defaults to None.
-        """
         self.api_base = api_base or Settings.DEFAULT_OLLAMA_CLIENT
         self.headers = headers
         self.preload_model = preload_model
-        self.options = options
+        self.options = options or {}
         super().__init__(model_name, system_prompt, system_prompt_file, self.api_base)
         logging.info(f"Using Ollama with {model_name} model 🤖")
         self.role: str = role
-        self.options = options
-        self.max_context_size = (
-            self.options.get(OLLAMA_OPTION_CONTEXT_SIZE, OLLAMA_DEFAULT_CONTEXT_SIZE)
-            if self.options
-            else OLLAMA_DEFAULT_CONTEXT_SIZE
-        )
 
     @override
-    def load(self) -> Client:
-        """
-        Loads the Ollama model client.
-
-        Returns:
-            Client: An instance of the Ollama model client, configured with the necessary host and headers.
-        """
-        ollama_client = Client(host=self.api_base, headers=self.headers)
-
+    def load(self) -> ChatOllama:
+        model = ChatOllama(
+            model=self.model_name,
+            base_url=self.api_base,
+            headers=self.headers,
+            **self.options,
+        )
         if self.preload_model:
-            ollama_client.chat(
-                model=self.model_name,
-                messages=[],
-                options=self.options,
-            )
-        return ollama_client
+            try:
+                model.invoke([HumanMessage(content="hi")])
+            except Exception:
+                pass
+        return model
+
+    def _build_messages(self, input: Dict[str, Any]):
+        messages = []
+        if self.system_prompt:
+            messages.append(SystemMessage(content=self.system_prompt))
+        for msg in input.get("history", []):
+            if msg["role"] == "assistant":
+                messages.append(AIMessage(content=msg["content"]))
+            else:
+                messages.append(HumanMessage(content=msg["content"]))
+
+        question = input.get("question", "")
+        if "images" in input:
+            content = [{"type": "text", "text": question}]
+            for img in input["images"]:
+                b64 = base64.b64encode(img["bytes"]).decode() if isinstance(img.get("bytes"), bytes) else img.get("base64", "")
+                content.append({"type": "image_url", "image_url": f"data:image/jpeg;base64,{b64}"})
+            messages.append(HumanMessage(content=content))
+        else:
+            messages.append(HumanMessage(content=question))
+        return messages
 
     @override
     def generate(self, input: Dict[str, Any]) -> str:
-        """
-        Generates text using the Ollama model.
-
-        Args:
-            input (Dict[str, Any]): A dictionary containing the input data for text generation. The structure should
-                                    include the necessary keys for the Ollama API.
-
-        Returns:
-            str: The generated output from the model.
-        """
-        history = input.get("history", [])
-        messages = []
-        messages.append({"role": "system", "content": self.system_prompt})
-        if history:
-            messages.extend(history)
-
-        user_prompt = input.get("question", "")
-        user_message = {"role": self.role, "content": user_prompt}
-
-        if "images" in input:
-            images = [img["bytes"] for img in input["images"]]
-            del input["images"]
-            user_message["images"] = images
-        messages.append(user_message)
-        response = self.model.chat(
-            model=self.model_name,
-            messages=messages,
-            options=self.options,
-        )
-
-        token_usage = response.eval_count + response.prompt_eval_count
-        if token_usage / self.max_context_size > OLLAMA_WARNING_CONTEXT_SIZE:
-            logging.warning(
-                f"Over {OLLAMA_WARNING_CONTEXT_SIZE * 100}% of context window reached, consider increasing it or reducing prompt size."
-                + f" Current usage : {token_usage}  out of {self.max_context_size} Tokens"
-            )
-
-        return response.message.content
+        response = self.model.invoke(self._build_messages(input))
+        return response.content
 
     @override
-    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
-        """
-        Generates text using the Ollama model in streaming mode.
-
-        Args:
-            input (Dict[str, Any]): A dictionary containing the input data for text generation. The structure should
-                                    include the necessary keys for the Ollama API.
-
-        Yields:
-              str: Chunks of the generated output as they become available.
-        """
-        history = input.get("history", [])
-        messages = []
-        messages.append({"role": "system", "content": self.system_prompt})
-        if history:
-            messages.extend(history)
-
-        user_prompt = input.get("question", "")
-        user_message = {"role": self.role, "content": user_prompt}
-
-        if "images" in input:
-            images = [img["bytes"] for img in input["images"]]
-            user_message["images"] = images
-        messages.append(user_message)
-
-        response = self.model.chat(
-            model=self.model_name,
-            messages=messages,
-            options=self.options,
-            stream=True,
-        )
-        for chunk in response:
-            yield chunk.message.content
+    def generate_streaming(self, input: Dict[str, Any], callbacks=None) -> Iterable[str]:
+        config = {"callbacks": callbacks} if callbacks else {}
+        for chunk in self.model.stream(self._build_messages(input), config=config):
+            if chunk.content:
+                yield chunk.content

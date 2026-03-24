@@ -93,7 +93,7 @@ class BedrockModel(LLM):
         return response.content
 
     @override
-    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
+    def generate_streaming(self, input: Dict[str, Any], callbacks=None) -> Iterable[str]:
         history = input.get("history", [])
         messages = []
 
@@ -108,6 +108,7 @@ class BedrockModel(LLM):
 
         messages.append(HumanMessage(content=input.get("question", "")))
 
-        for chunk in self.model.stream(messages):
+        stream_config = {"callbacks": callbacks} if callbacks else {}
+        for chunk in self.model.stream(messages, config=stream_config):
             if chunk.content:
                 yield chunk.content

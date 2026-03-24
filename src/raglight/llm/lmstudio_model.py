@@ -5,7 +5,8 @@ from ..config.settings import Settings
 from .llm import LLM
 import logging
 
-from openai import OpenAI
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 
 class LMStudioModel(LLM):
@@ -23,49 +24,41 @@ class LMStudioModel(LLM):
         self.role: str = role
 
     @override
-    def load(self) -> OpenAI:
-        return OpenAI(base_url=self.api_base, api_key="lm-studio")
+    def load(self) -> ChatOpenAI:
+        return ChatOpenAI(
+            model=self.model_name,
+            base_url=self.api_base,
+            api_key="lm-studio",
+        )
+
+    def _build_messages(self, input: Dict[str, Any]):
+        messages = []
+        if self.system_prompt:
+            messages.append(SystemMessage(content=self.system_prompt))
+        for msg in input.get("history", []):
+            if msg["role"] == "assistant":
+                messages.append(AIMessage(content=msg["content"]))
+            else:
+                messages.append(HumanMessage(content=msg["content"]))
+
+        question = input.get("question", "")
+        if "images" in input:
+            content = [{"type": "text", "text": question}]
+            for image in input["images"]:
+                content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image['base64']}"}})
+            messages.append(HumanMessage(content=content))
+        else:
+            messages.append(HumanMessage(content=question))
+        return messages
 
     @override
     def generate(self, input: Dict[str, Any]) -> str:
-        history = input.get("history", [])
-        messages = [{"role": "system", "content": self.system_prompt}]
-
-        for msg in history:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-
-        payload = {"role": self.role, "content": input.get("question", "")}
-        if "images" in input:
-            payload["images"] = input["images"]
-        messages.append(payload)
-
-        response = self.model.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            temperature=0.7,
-        )
-        return response.choices[0].message.content
+        response = self.model.invoke(self._build_messages(input))
+        return response.content
 
     @override
-    def generate_streaming(self, input: Dict[str, Any]) -> Iterable[str]:
-        history = input.get("history", [])
-        messages = [{"role": "system", "content": self.system_prompt}]
-
-        for msg in history:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-
-        payload = {"role": self.role, "content": input.get("question", "")}
-        if "images" in input:
-            payload["images"] = input["images"]
-        messages.append(payload)
-
-        response = self.model.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            temperature=0.7,
-            stream=True,
-        )
-        for chunk in response:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
+    def generate_streaming(self, input: Dict[str, Any], callbacks=None) -> Iterable[str]:
+        config = {"callbacks": callbacks} if callbacks else {}
+        for chunk in self.model.stream(self._build_messages(input), config=config):
+            if chunk.content:
+                yield chunk.content
