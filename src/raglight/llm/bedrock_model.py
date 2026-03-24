@@ -61,7 +61,7 @@ class BedrockModel(LLM):
             ChatBedrock: The LangChain Bedrock chat client.
         """
         return ChatBedrock(
-            model=self.model_name,
+            model_id=self.model_name,
             region_name=self.region_name,
         )
 
