@@ -23,12 +23,10 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 - [Import library](#import-library-🛠️)
 
 - [Chat with Your Documents Instantly With CLI](#chat-with-your-documents-instantly-with-cli-💬)
-
   - [Ignore Folders Feature](#ignore-folders-feature-🚫)
   - [Ignore Folders in Configuration Classes](#ignore-folders-in-configuration-classes-🚫)
 
 - [Deploy as a REST API (raglight serve)](#deploy-as-a-rest-api-raglight-serve-🌐)
-
   - [Start the server](#start-the-server)
   - [Launch the Chat UI](#launch-the-chat-ui-💬)
   - [Endpoints](#endpoints)
@@ -38,13 +36,11 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
 - [Environment Variables](#environment-variables)
 
 - [Providers and Databases](#providers-and-databases)
-
   - [LLM](#llm)
   - [Embeddings](#embeddings)
   - [Vector Store](#vector-store)
 
 - [Quick Start](#quick-start-🚀)
-
   - [Knowledge Base](#knowledge-base)
   - [RAG](#rag)
   - [Agentic RAG](#agentic-rag)
@@ -60,7 +56,6 @@ Designed for simplicity and flexibility, RAGLight provides modular components to
   - [Observability with Langfuse](#observability-with-langfuse)
 
 - [Use RAGLight with Docker](#use-raglight-with-docker)
-
   - [Build your image](#build-your-image)
   - [Run your image](#run-your-image)
 
@@ -109,11 +104,11 @@ pip install raglight
 
 RAGLight uses **optional extras** for vector store backends, so you only install what you need:
 
-| Extra | Package installed | Notes |
-|---|---|---|
-| `raglight[chroma]` | `chromadb` | Requires a C++ compiler on Windows |
-| `raglight[qdrant]` | `qdrant-client` | Pure Python — works on Windows without a C++ compiler |
-| `raglight[langfuse]` | `langfuse` | Observability tracing |
+| Extra                | Package installed | Notes                                                 |
+| -------------------- | ----------------- | ----------------------------------------------------- |
+| `raglight[chroma]`   | `chromadb`        | Requires a C++ compiler on Windows                    |
+| `raglight[qdrant]`   | `qdrant-client`   | Pure Python — works on Windows without a C++ compiler |
+| `raglight[langfuse]` | `langfuse`        | Observability tracing                                 |
 
 ```bash
 pip install "raglight[qdrant]"           # Qdrant only (Windows-friendly)
@@ -256,12 +251,13 @@ Add `--ui` to start a **Streamlit chat interface** alongside the REST API — no
 raglight serve --ui
 ```
 
-| Address | Service |
-|---|---|
+| Address                 | Service                      |
+| ----------------------- | ---------------------------- |
 | `http://localhost:8000` | REST API + Swagger (`/docs`) |
-| `http://localhost:8501` | Streamlit chat UI |
+| `http://localhost:8501` | Streamlit chat UI            |
 
 The UI lets you:
+
 - **Chat** with your documents — full conversation history, markdown rendering
 - **Upload files** directly from the browser (PDF, TXT, code…)
 - **Ingest a directory** by providing a path on the server machine
@@ -277,15 +273,15 @@ Both processes share the same configuration (env vars) and are terminated togeth
 
 ### Endpoints
 
-| Method | Path | Body | Response |
-|---|---|---|---|
-| `GET` | `/health` | — | `{"status": "ok"}` |
-| `POST` | `/generate` | `{"question": "..."}` | `{"answer": "..."}` |
-| `POST` | `/ingest` | `{"data_path": "...", "file_paths": [...], "github_url": "...", "github_branch": "main"}` | `{"message": "..."}` |
-| `POST` | `/ingest/upload` | `multipart/form-data` — field `files` (one or more files) | `{"message": "..."}` |
-| `GET` | `/collections` | — | `{"collections": [...]}` |
-| `GET` | `/config` | — | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}` |
-| `POST` | `/config` | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}` | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}` |
+| Method | Path             | Body                                                                                      | Response                                                             |
+| ------ | ---------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `GET`  | `/health`        | —                                                                                         | `{"status": "ok"}`                                                   |
+| `POST` | `/generate`      | `{"question": "..."}`                                                                     | `{"answer": "..."}`                                                  |
+| `POST` | `/ingest`        | `{"data_path": "...", "file_paths": [...], "github_url": "...", "github_branch": "main"}` | `{"message": "..."}`                                                 |
+| `POST` | `/ingest/upload` | `multipart/form-data` — field `files` (one or more files)                                 | `{"message": "..."}`                                                 |
+| `GET`  | `/collections`   | —                                                                                         | `{"collections": [...]}`                                             |
+| `GET`  | `/config`        | —                                                                                         | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}` |
+| `POST` | `/config`        | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}`                      | `{"llm_provider": "...", "llm_model": "...", "llm_api_base": "..."}` |
 
 The interactive API documentation (Swagger UI) is automatically available at `http://localhost:8000/docs`.
 
@@ -323,23 +319,22 @@ curl http://localhost:8000/collections
 
 All server settings are read from `RAGLIGHT_*` environment variables. Copy `examples/serve_example/.env.example` to `.env` and adjust the values.
 
-| Variable | Default | Description |
-|---|---|---|
-| `RAGLIGHT_LLM_MODEL` | `llama3` | LLM model name |
-| `RAGLIGHT_LLM_PROVIDER` | `Ollama` | LLM provider (`Ollama`, `Mistral`, `OpenAI`, `LmStudio`, `GoogleGemini`) |
-| `RAGLIGHT_LLM_API_BASE` | `http://localhost:11434` | LLM API base URL |
-| `RAGLIGHT_EMBEDDINGS_MODEL` | `all-MiniLM-L6-v2` | Embeddings model name |
-| `RAGLIGHT_EMBEDDINGS_PROVIDER` | `HuggingFace` | Embeddings provider (`HuggingFace`, `Ollama`, `OpenAI`, `GoogleGemini`) |
-| `RAGLIGHT_EMBEDDINGS_API_BASE` | `http://localhost:11434` | Embeddings API base URL |
-| `RAGLIGHT_DB` | `Chroma` | Vector store backend (`Chroma` or `Qdrant`) |
-| `RAGLIGHT_PERSIST_DIR` | `./raglight_db` | Local persistence directory (used when `RAGLIGHT_DB_HOST` is not set) |
-| `RAGLIGHT_COLLECTION` | `default` | Collection name |
-| `RAGLIGHT_K` | `5` | Number of documents retrieved per query |
-| `RAGLIGHT_SYSTEM_PROMPT` | *(default prompt)* | Custom system prompt for the LLM |
-| `RAGLIGHT_DB_HOST` | — | Remote vector store host (leave unset for local on-disk storage) |
-| `RAGLIGHT_DB_PORT` | — | Remote vector store port |
-| `RAGLIGHT_API_TIMEOUT` | `300` | Request timeout in seconds for the Streamlit UI (increase for slow models) |
-
+| Variable                       | Default                  | Description                                                                |
+| ------------------------------ | ------------------------ | -------------------------------------------------------------------------- |
+| `RAGLIGHT_LLM_MODEL`           | `llama3`                 | LLM model name                                                             |
+| `RAGLIGHT_LLM_PROVIDER`        | `Ollama`                 | LLM provider (`Ollama`, `Mistral`, `OpenAI`, `LmStudio`, `GoogleGemini`)   |
+| `RAGLIGHT_LLM_API_BASE`        | `http://localhost:11434` | LLM API base URL                                                           |
+| `RAGLIGHT_EMBEDDINGS_MODEL`    | `all-MiniLM-L6-v2`       | Embeddings model name                                                      |
+| `RAGLIGHT_EMBEDDINGS_PROVIDER` | `HuggingFace`            | Embeddings provider (`HuggingFace`, `Ollama`, `OpenAI`, `GoogleGemini`)    |
+| `RAGLIGHT_EMBEDDINGS_API_BASE` | `http://localhost:11434` | Embeddings API base URL                                                    |
+| `RAGLIGHT_DB`                  | `Chroma`                 | Vector store backend (`Chroma` or `Qdrant`)                                |
+| `RAGLIGHT_PERSIST_DIR`         | `./raglight_db`          | Local persistence directory (used when `RAGLIGHT_DB_HOST` is not set)      |
+| `RAGLIGHT_COLLECTION`          | `default`                | Collection name                                                            |
+| `RAGLIGHT_K`                   | `5`                      | Number of documents retrieved per query                                    |
+| `RAGLIGHT_SYSTEM_PROMPT`       | _(default prompt)_       | Custom system prompt for the LLM                                           |
+| `RAGLIGHT_DB_HOST`             | —                        | Remote vector store host (leave unset for local on-disk storage)           |
+| `RAGLIGHT_DB_PORT`             | —                        | Remote vector store port                                                   |
+| `RAGLIGHT_API_TIMEOUT`         | `300`                    | Request timeout in seconds for the Streamlit UI (increase for slow models) |
 
 ### Deploy with Docker Compose
 
@@ -402,10 +397,10 @@ For embeddings models, you can use these providers :
 
 For your vector store, you can use :
 
-| Provider | Constant | Extra | Windows (no C++) |
-|---|---|---|---|
+| Provider | Constant          | Extra              | Windows (no C++)             |
+| -------- | ----------------- | ------------------ | ---------------------------- |
 | ChromaDB | `Settings.CHROMA` | `raglight[chroma]` | No — requires a C++ compiler |
-| Qdrant | `Settings.QDRANT` | `raglight[qdrant]` | Yes — pure Python client |
+| Qdrant   | `Settings.QDRANT` | `raglight[qdrant]` | Yes — pure Python client     |
 
 Both support local (on-disk) and remote (HTTP) modes.
 
@@ -704,13 +699,13 @@ With this setup, all `.pdf` files will be processed by your custom `VlmPDFProces
 
 ### Hybrid Search (BM25 + Semantic + RRF) 🔍
 
-RAGLight supports three retrieval strategies, configurable via the `search_type` parameter:
+RAGLight supports three retrieval strategies, configurable via the `search_type` parameter. Both **Chroma** and **Qdrant** backends are supported.
 
-| Mode | Description |
-|---|---|
-| `"semantic"` | Dense vector similarity search (default) |
-| `"bm25"` | Keyword-based BM25 search |
-| `"hybrid"` | BM25 + semantic merged with Reciprocal Rank Fusion (RRF) |
+| Mode         | Description                                              |
+| ------------ | -------------------------------------------------------- |
+| `"semantic"` | Dense vector similarity search (default)                 |
+| `"bm25"`     | Keyword-based BM25 search                                |
+| `"hybrid"`   | BM25 + semantic merged with Reciprocal Rank Fusion (RRF) |
 
 #### With the Builder API
 
@@ -718,11 +713,12 @@ RAGLight supports three retrieval strategies, configurable via the `search_type`
 from raglight.rag.builder import Builder
 from raglight.config.settings import Settings
 
+# Works with Settings.CHROMA or Settings.QDRANT
 rag = (
     Builder()
     .with_embeddings(Settings.HUGGINGFACE, model_name="all-MiniLM-L6-v2")
     .with_vector_store(
-        Settings.CHROMA,
+        Settings.QDRANT,                     # or Settings.CHROMA
         persist_directory="./myDb",
         collection_name="my_collection",
         search_type=Settings.SEARCH_HYBRID,  # "semantic" | "bm25" | "hybrid"
@@ -838,7 +834,7 @@ rag = (
 
 ### Query Reformulation ✍️
 
-RAGLight automatically rewrites follow-up questions into standalone queries before retrieval. This dramatically improves accuracy in multi-turn conversations where the user's question references previous context (e.g. *"and for Python?"* → *"How do I do X in Python?"*).
+RAGLight automatically rewrites follow-up questions into standalone queries before retrieval. This dramatically improves accuracy in multi-turn conversations where the user's question references previous context (e.g. _"and for Python?"_ → _"How do I do X in Python?"_).
 
 Reformulation is **enabled by default**. The current LLM is used to rewrite the question; if there is no conversation history yet, the question is passed through unchanged.
 
@@ -880,6 +876,7 @@ rag = (
 The reformulated question is logged at `INFO` level so you can inspect what the LLM produced.
 
 **Pipeline with reformulation enabled:**
+
 ```
 reformulate → retrieve → [rerank?] → generate
 ```
@@ -954,20 +951,21 @@ rag = (
 RAGLight supports AWS Bedrock for both LLM inference and embeddings. Authentication relies on the standard boto3 credential chain (env vars, `~/.aws/credentials`, or IAM role).
 
 **AWS credentials (one of):**
+
 - Environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`
 - AWS credentials file: `~/.aws/credentials`
 - IAM role (EC2 / ECS / Lambda)
 
 **Supported models (examples):**
 
-| Type | Model ID |
-|---|---|
-| LLM | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
-| LLM | `anthropic.claude-3-haiku-20240307-v1:0` |
-| LLM | `amazon.titan-text-express-v1` |
-| LLM | `meta.llama3-8b-instruct-v1:0` |
-| Embeddings | `amazon.titan-embed-text-v2:0` |
-| Embeddings | `cohere.embed-english-v3` |
+| Type       | Model ID                                    |
+| ---------- | ------------------------------------------- |
+| LLM        | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
+| LLM        | `anthropic.claude-3-haiku-20240307-v1:0`    |
+| Embeddings | `amazon.titan-embed-text-v2:0`              |
+| Embeddings | `cohere.embed-english-v3`                   |
+
+> **Cross-region inference profiles**: newer Claude models (Claude 3.7+, Claude 4) require a cross-region inference profile ID instead of the bare model ID. Use a `us.`, `eu.`, or `ap.` prefix — for example `us.anthropic.claude-sonnet-4-6`. Run `aws bedrock list-inference-profiles` to list profiles available in your account.
 
 ```python
 from raglight.rag.simple_rag_api import RAGPipeline
@@ -1005,6 +1003,10 @@ print(response)
 ### Observability with Langfuse
 
 RAGLight supports **Langfuse 4.0.0** for full observability of your RAG pipeline. Every `generate()` call is traced as a single Langfuse trace, with each LangGraph node (retrieve, rerank, generate) appearing as a separate span.
+
+Both `generate()` and `generate_streaming()` propagate Langfuse callbacks automatically across all providers (Ollama, OpenAI, Mistral, Gemini, LMStudio, Bedrock).
+
+> **Note**: If Langfuse credentials are not configured, RAGLight automatically sets `LANGFUSE_TRACING_ENABLED=false` to prevent Langfuse v4 from attempting to connect to `localhost:3000` on startup.
 
 #### Install the extra dependency
 
